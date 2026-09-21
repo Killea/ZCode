@@ -93,6 +93,10 @@ export function serializeRegistryModelConfig(
       supportsJsonSchemaOutput: config.properties.supportsJsonSchemaOutput,
       supportsNativeWebSearch: config.properties.supportsNativeWebSearch,
       supportsMidConversationSystem: config.properties.supportsMidConversationSystem,
+      // 可选叶子：未设置时不序列化，保持内置模型快照逐字不变。
+      ...(config.properties.streamIdleTimeoutMs === undefined
+        ? {}
+        : { streamIdleTimeoutMs: config.properties.streamIdleTimeoutMs }),
     },
     optionSpecs: {
       reasoningLevel: config.optionSpecs.reasoningLevel,

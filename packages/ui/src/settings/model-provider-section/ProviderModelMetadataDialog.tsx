@@ -17,7 +17,10 @@ import type {
   ProviderModelDraftCommitResult,
 } from "@/settings/model-provider-section/ProviderModelMetadata.js";
 import { ProviderModelInputModalityOptions } from "@/settings/model-provider-section/ProviderModelModalityOptions.js";
-import { BooleanModelOption } from "@/settings/model-provider-section/ProviderModelMetadataFields.js";
+import {
+  BooleanModelOption,
+  StreamIdleTimeoutField,
+} from "@/settings/model-provider-section/ProviderModelMetadataFields.js";
 import {
   ModelSettingsGroup,
   ProviderModelReasoningSettings,
@@ -88,6 +91,7 @@ export function ProviderModelMetadataDialog({
   };
   const contextWindowInputId = useId();
   const maxOutputInputId = useId();
+  const streamIdleTimeoutInputId = useId();
   const smart = draft.useRecommendedConfigValue !== false;
   const activeOverrides = smart ? overrideFields : new Set<string>();
   const overridden = (field: string, legacy = false) =>
@@ -298,6 +302,24 @@ export function ProviderModelMetadataDialog({
                 />
               </div>
             </div>
+          </ModelSettingsGroup>
+          <ModelSettingsGroup group="tokens">
+            <StreamIdleTimeoutField
+              inputId={streamIdleTimeoutInputId}
+              value={draft.streamIdleTimeoutValue}
+              overridden={overridden(
+                "streamIdleTimeoutValue",
+                personalConfig?.properties?.streamIdleTimeoutMs !== undefined,
+              )}
+              placeholder={
+                draft.useRecommendedConfigValue === false ||
+                inheritedConfig?.properties?.streamIdleTimeoutMs == null
+                  ? undefined
+                  : String(inheritedConfig.properties.streamIdleTimeoutMs / 1000)
+              }
+              onChange={(streamIdleTimeoutValue) => onDraftChange({ streamIdleTimeoutValue })}
+              onCommit={() => void commit()}
+            />
           </ModelSettingsGroup>
           <ModelEditorAdvanced
             open={open}

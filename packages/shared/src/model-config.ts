@@ -75,6 +75,12 @@ export const completeModelPropertiesDataSchema = z
     supportsJsonSchemaOutput: z.boolean(),
     supportsNativeWebSearch: z.boolean(),
     supportsMidConversationSystem: z.boolean(),
+    /**
+     * 模型级 SSE 流空闲超时（毫秒，可选）：本地推理/排队慢的模型需要比进程级默认更长的
+     * 等待窗口。缺省回退 `modelStream.idleTimeoutMs` / DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS，
+     * 见 docs/model-stream-idle-timeout.md。
+     */
+    streamIdleTimeoutMs: z.number().int().positive().optional(),
   })
   .strict();
 export const modelPropertiesDataSchema = z

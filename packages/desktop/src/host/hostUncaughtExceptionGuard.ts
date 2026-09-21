@@ -7,6 +7,15 @@ function isRecoverableHostAllocationError(error: unknown): error is RangeError {
   return error instanceof RangeError && error.message === "Failed to allocate memory";
 }
 
+// 向已关闭管道写入（stdout/stderr 旁路日志、子进程 stdin 等）抛出的 EPIPE
+// 只代表"丢失一次写"，不携带进程级损坏状态；逃逸到这里时按可恢复处理，
+// 由调用方各自的失败路径继续收敛，不能升级成杀进程。
+function isRecoverableHostPipeError(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as NodeJS.ErrnoException).code === "EPIPE"
+  );
+}
+
 export function createHostUncaughtExceptionHandler({
   onRecovered,
   onFatal,
@@ -15,7 +24,7 @@ export function createHostUncaughtExceptionHandler({
   origin: NodeJS.UncaughtExceptionOrigin,
 ) => void {
   return (error, origin) => {
-    if (!isRecoverableHostAllocationError(error)) {
+    if (!isRecoverableHostAllocationError(error) && !isRecoverableHostPipeError(error)) {
       onFatal(error, origin);
       return;
     }

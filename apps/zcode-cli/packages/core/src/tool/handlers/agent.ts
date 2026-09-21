@@ -93,10 +93,17 @@ function buildAgentProviderDescription(
     embeddedSearchEnabled?: boolean;
     profiles?: readonly AgentProfile[];
     dynamicWorkflowEnabled?: boolean;
+    /**
+     * 调用模型是否支持 provider-native WebSearch；`=== false` 时 Explore 的
+     * (Tools: …) 清单去掉 WebSearch——模型看不到名字才不会幻觉调用一个
+     * 该 providerKind 无法编码的工具。缺席时保持默认（含 WebSearch）。
+     */
+    nativeWebSearchSupported?: boolean;
   } = {},
 ): string {
   const agentList = formatAgentProfilesForPrompt(options.profiles ?? [], {
     embeddedSearchEnabled: options.embeddedSearchEnabled,
+    nativeWebSearchSupported: options.nativeWebSearchSupported,
   });
 
   return [
@@ -284,6 +291,9 @@ function canReadBackgroundOutputFile(toolNames: readonly string[] | undefined): 
   return names.has("Read") || names.has("Bash");
 }
 
+const TASK_DESCRIPTION_PREFIX =
+  "Claude Code-compatible alias for the Agent tool. Use this when plugin instructions ask for the Task tool.";
+
 export const taskToolEntry: ToolEntry = {
   ...agentToolEntry,
   capability: "Claude Code-compatible alias for launching a ZCode subagent",
@@ -292,7 +302,7 @@ export const taskToolEntry: ToolEntry = {
     name: TASK_TOOL_NAME,
     providerVisible: false,
     description: [
-      "Claude Code-compatible alias for the Agent tool. Use this when plugin instructions ask for the Task tool.",
+      TASK_DESCRIPTION_PREFIX,
       "",
       agentToolEntry.metadata.description ?? "",
     ].join("\n"),
@@ -303,12 +313,25 @@ function createTaskToolEntryFromAgent(entry: ToolEntry): ToolEntry {
   return {
     ...entry,
     capability: "Claude Code-compatible alias for launching a ZCode subagent",
+    // Agent 的模型投影只产出 Agent 段描述；Task 的固定前缀必须在投影结果上保留，
+    // 否则按模型重建描述时前缀丢失（与上面静态 description 同一组装规则）。
+    resolveModelContract:
+      entry.resolveModelContract === undefined
+        ? undefined
+        : (context) => {
+            const projection = entry.resolveModelContract!(context);
+            if (projection?.description === undefined) return projection;
+            return {
+              ...projection,
+              description: [TASK_DESCRIPTION_PREFIX, "", projection.description].join("\n"),
+            };
+          },
     metadata: {
       ...entry.metadata,
       name: TASK_TOOL_NAME,
       providerVisible: false,
       description: [
-        "Claude Code-compatible alias for the Agent tool. Use this when plugin instructions ask for the Task tool.",
+        TASK_DESCRIPTION_PREFIX,
         "",
         entry.metadata.description ?? "",
       ].join("\n"),
@@ -322,10 +345,29 @@ export function createAgentToolEntry(
     profiles?: readonly AgentProfile[];
     /** 见 buildAgentProviderDescription：缺省 true，只有灰度显式关闭时才去掉工作流那一行。 */
     dynamicWorkflowEnabled?: boolean;
+    /**
+     * 模型能力无关的调用方（TUI/headless 装配、测试）可用静态开关；模型在场时
+     * resolveModelContract 总是以 context.model.properties 为准，见下。
+     */
+    nativeWebSearchSupported?: boolean;
   } = {},
 ): ToolEntry {
   return {
     ...agentToolEntry,
+    // 描述是模型可见契约的一部分，必须按发起调用的模型投影：模型不支持
+    // provider-native WebSearch（如 openai-compatible 本地推理）时，Explore 的
+    // (Tools: …) 清单里去掉 WebSearch。只删 allowlist 不删描述，模型仍会从文本中
+    // 学到这个名字并幻觉调用 → executor 把名字放给已注册的 WebSearch handler →
+    // 每次必撞 invalid_model_request。
+    resolveModelContract: (context) => ({
+      description: buildAgentProviderDescription({
+        ..._options,
+        nativeWebSearchSupported:
+          context.model === undefined
+            ? _options.nativeWebSearchSupported
+            : context.model.properties.supportsNativeWebSearch,
+      }),
+    }),
     metadata: {
       ...agentToolEntry.metadata,
       description: buildAgentProviderDescription(_options),
@@ -339,6 +381,7 @@ export function createTaskToolEntry(
     profiles?: readonly AgentProfile[];
     /** Task 是 Agent 的兼容别名，描述整段内嵌 Agent 的，因此同一道门一起传下去。 */
     dynamicWorkflowEnabled?: boolean;
+    nativeWebSearchSupported?: boolean;
   } = {},
 ): ToolEntry {
   return createTaskToolEntryFromAgent(createAgentToolEntry(options));

@@ -14,6 +14,8 @@ export interface ProviderModelDraftValues {
   idValue: string;
   contextWindowValue: string;
   maxOutputTokensValue: string;
+  /** SSE 流空闲超时，单位秒；空串 = 不写个人覆盖（继承或进程级默认 30min）。 */
+  streamIdleTimeoutValue: string;
   inputFormatValue: ProviderModelInputFormatDraft;
   enabledValue?: boolean;
   useRecommendedConfigValue?: boolean;
@@ -36,6 +38,7 @@ export type ProviderModelDraftCommitResult =
         | "id"
         | "contextWindow"
         | "maxOutputTokens"
+        | "streamIdleTimeout"
         | "inputFormat"
         | "reasoningLevelValues"
         | "reasoningLevelMap";
@@ -58,6 +61,10 @@ export function createProviderModelDraftValues(
       model.personalConfig.optionSpecs?.maxOutputTokens?.max == null
         ? ""
         : String(model.personalConfig.optionSpecs.maxOutputTokens.max),
+    streamIdleTimeoutValue:
+      model.personalConfig.properties?.streamIdleTimeoutMs == null
+        ? ""
+        : String(model.personalConfig.properties.streamIdleTimeoutMs / 1000),
     inputFormatValue: {
       supportsText: inputFormat?.supportsText ?? true,
       supportsImage: inputFormat?.supportsImage ?? false,
@@ -141,6 +148,18 @@ export function resolveProviderModelDraftCommit({
     return { status: "invalid", field: "maxOutputTokens" };
   }
 
+  const streamIdleTimeoutInput = draft.streamIdleTimeoutValue.trim();
+  const streamIdleTimeoutSeconds = streamIdleTimeoutInput
+    ? parsePositiveIntegerDraft(streamIdleTimeoutInput)
+    : undefined;
+  if (streamIdleTimeoutInput && streamIdleTimeoutSeconds === null) {
+    return { status: "invalid", field: "streamIdleTimeout" };
+  }
+  const streamIdleTimeoutMs =
+    typeof streamIdleTimeoutSeconds === "number"
+      ? streamIdleTimeoutSeconds * 1000
+      : inherited?.properties?.streamIdleTimeoutMs;
+
   if (!draft.inputFormatValue.supportsText) {
     return { status: "invalid", field: "inputFormat" };
   }
@@ -191,6 +210,8 @@ export function resolveProviderModelDraftCommit({
       draft.supportsMidConversationSystemValue ??
       currentModel.config.properties?.supportsMidConversationSystem ??
       false,
+    // 未填写时不落任何值：智能模式继承 inherited，固定模式回退进程级默认（30min）。
+    ...(streamIdleTimeoutMs === undefined ? {} : { streamIdleTimeoutMs }),
   };
   const personalProperties = buildPersonalProperties({
     current: currentModel.personalConfig.properties,
@@ -202,6 +223,9 @@ export function resolveProviderModelDraftCommit({
   if (draft.contextWindowValue.trim())
     assignMutable(personalProperties, "contextWindow", contextWindow);
   else deleteMutable(personalProperties, "contextWindow");
+  if (draft.streamIdleTimeoutValue.trim())
+    assignMutable(personalProperties, "streamIdleTimeoutMs", streamIdleTimeoutMs);
+  else deleteMutable(personalProperties, "streamIdleTimeoutMs");
   for (const key of [
     "supportsJsonSchemaOutput",
     "supportsNativeWebSearch",

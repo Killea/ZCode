@@ -7,6 +7,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 type ModelConfigHelpField =
   | "contextWindow"
   | "maxOutputTokens"
+  | "streamIdleTimeout"
   | "inputModalities"
   | "outputModalities"
   | "capabilities"

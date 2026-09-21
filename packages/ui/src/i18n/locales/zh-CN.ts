@@ -2835,6 +2835,8 @@ const zhCN: Record<string, string> = {
     "模型一次可处理的上下文容量，单位为 Token。ZCode 会据此管理上下文。\n请勿超过模型的实际上限。",
   "settings.modelProvider.help.maxOutputTokens":
     "单次模型请求允许生成的最大 Token 数。\n请勿超过模型的实际上限。",
+  "settings.modelProvider.help.streamIdleTimeout":
+    "模型流式响应中任意两次事件之间的最长等待时间，单位为秒。\n该等待也覆盖请求在供应商侧排队、推理的时间；本地推理或并发子代理排队较慢时可适当调大，默认 1800（30 分钟）。留空则使用默认值。",
   "settings.modelProvider.help.inputModalities":
     "设置模型能够接收的内容类型：\n\n- **文本**：接收文本内容，为必选项。\n- **图片**：接收图片内容。\n- **视频**：接收视频内容。\n- **PDF**：直接接收 PDF 文档。",
   "settings.modelProvider.help.outputModalities":
@@ -2881,6 +2883,7 @@ const zhCN: Record<string, string> = {
   "settings.modelProvider.reasoning": "推理设置",
   "settings.hooks.advanced": "高级",
   "settings.modelProvider.maxOutputTokens": "最大输出 Token",
+  "settings.modelProvider.streamIdleTimeout": "流式空闲超时（秒）",
   "settings.modelProvider.inputModalities": "输入类型",
   "settings.modelProvider.outputModalities": "输出类型",
   "settings.modelProvider.modality.text": "文本",
@@ -2892,6 +2895,7 @@ const zhCN: Record<string, string> = {
   "settings.modelProvider.modelMetadata.invalid.kinds": "至少选择一种 API 格式",
   "settings.modelProvider.modelMetadata.invalid.contextWindow": "上下文窗口必须是正整数",
   "settings.modelProvider.modelMetadata.invalid.maxOutputTokens": "最大输出 Token 必须是正整数",
+  "settings.modelProvider.modelMetadata.invalid.streamIdleTimeout": "流式空闲超时必须是正整数秒",
   "settings.modelProvider.modelMetadata.invalid.inputModalities": "输入类型必须包含文本",
   "settings.modelProvider.newProviderName": "新供应商",
   "settings.modelProvider.modelsPlaceholder": "每行一个模型名称",

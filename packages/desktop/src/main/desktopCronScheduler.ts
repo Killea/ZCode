@@ -60,6 +60,10 @@ const DISPOSE_FORCE_KILL_MS = 1_500;
 export function spawnCronScheduler(deps: CronSchedulerDeps): CronSchedulerHandle {
   const child = electronUtilityProcess.fork(schedulerModulePath, [], {
     serviceName: "zcode-cron-scheduler",
+    // 与 spawnHostProcess 同理：不配 stdio 时默认 "inherit" 共享整个 App 的 stdout
+    // fd，读端一关 scheduler 的 console 写就抛 EPIPE。pipe 让 stdout/stderr 成为
+    // main 独占管道，同时接上 drain 防止缓冲打满后写阻塞。
+    stdio: "pipe",
     execArgv: ["--no-warnings"],
     env: {
       ...buildHostProcessEnv(deps.hostProcessLocalEnv),
@@ -68,6 +72,14 @@ export function spawnCronScheduler(deps: CronSchedulerDeps): CronSchedulerHandle
   });
 
   deps.logger.info(`[cron-scheduler] forked scheduler process pid=${child.pid}`);
+  // scheduler 的结构化日志走 postMessage（scheduler-log）；stdout/stderr 只剩
+  // console 兜底输出与 native warning，量小但必须有 consumer 持续排空管道。
+  child.stdout?.on("data", (data: Buffer) => {
+    deps.logger.info(`[cron-scheduler-stdout] ${data.toString().trimEnd()}`);
+  });
+  child.stderr?.on("data", (data: Buffer) => {
+    deps.logger.warn(`[cron-scheduler-stderr] ${data.toString().trimEnd()}`);
+  });
   // 资源遥测的 scheduler 角色 pid 只有 spawn 点知道，这里登记到进程角色注册表。
   registerSchedulerProcess(child);
   let isDisposing = false;

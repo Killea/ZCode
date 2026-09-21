@@ -1,10 +1,13 @@
 import { CheckIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useRef, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button.js";
 import { cn } from "@/components/lib/utils.js";
+import { Input } from "@/components/ui/input.js";
 import { Textarea } from "@/components/ui/textarea.js";
 import { TECHNICAL_INPUT_ATTRIBUTES } from "@/lib/technicalInputAttributes.js";
+import { isImeComposingKeyEvent } from "@/lib/imeComposition.js";
 import { modelEditorControlStyle } from "@/settings/model-provider-section/modelEditorControlStyle.js";
+import { ModelConfigInputLabel } from "@/settings/model-provider-section/ModelConfigHelp.js";
 
 export function BooleanModelOption({
   label,
@@ -57,6 +60,74 @@ export function ModelOptionCheckbox({ selected }: { selected: boolean }) {
     >
       {selected ? <CheckIcon className="size-3" /> : null}
     </span>
+  );
+}
+
+function selectInputText(event: Pick<FocusEvent<HTMLInputElement>, "currentTarget">) {
+  event.currentTarget.select();
+}
+
+/**
+ * 流式空闲超时（秒）数字输入。输入法组合跟踪必须按字段持有：复用外层共享 ref 会让
+ * 任一字段的候选确认 Enter 状态泄漏到别的字段。
+ */
+export function StreamIdleTimeoutField({
+  inputId,
+  value,
+  overridden = false,
+  placeholder,
+  onChange,
+  onCommit,
+}: {
+  inputId: string;
+  value: string;
+  overridden?: boolean;
+  placeholder?: string;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+}) {
+  const compositionActiveRef = useRef(false);
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") return;
+    // 输入法候选确认也会发出 Enter；组合状态按字段本地跟踪。
+    if (
+      isImeComposingKeyEvent({
+        compositionActive: compositionActiveRef.current,
+        nativeEvent: event.nativeEvent,
+      })
+    ) {
+      return;
+    }
+    event.preventDefault();
+    onCommit();
+  };
+  return (
+    <div>
+      <div className="mb-1 block text-ui-base text-foreground-subtle">
+        <ModelConfigInputLabel field="streamIdleTimeout" htmlFor={inputId} />
+      </div>
+      <Input
+        {...TECHNICAL_INPUT_ATTRIBUTES}
+        id={inputId}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        size="lg"
+        value={value}
+        data-personal-override={overridden}
+        className={modelEditorControlStyle(overridden)}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        onFocus={selectInputText}
+        onCompositionStart={() => {
+          compositionActiveRef.current = true;
+        }}
+        onCompositionEnd={() => {
+          compositionActiveRef.current = false;
+        }}
+        onKeyDown={handleKeyDown}
+      />
+    </div>
   );
 }
 

@@ -131,7 +131,7 @@ export function createBuiltInGeneralPurposeAgentProfile(
 
 export function formatAgentProfilesForPrompt(
   profiles: readonly AgentProfile[],
-  options: { embeddedSearchEnabled?: boolean } = {},
+  options: { embeddedSearchEnabled?: boolean; nativeWebSearchSupported?: boolean } = {},
 ): string | null {
   const active = normalizeAgentProfiles(profiles);
   if (active.length === 0) return null;

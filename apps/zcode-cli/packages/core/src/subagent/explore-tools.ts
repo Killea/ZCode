@@ -36,14 +36,27 @@ const EXPLORE_AGENT_DESCRIPTION_TOOL_PRIORITY_SET = new Set<ExploreAgentAllowedT
 
 export function buildExploreAllowedTools(options: {
   embeddedSearchEnabled?: boolean;
+  /**
+   * 调用方模型是否支持 provider-native WebSearch。`=== false` 时从两份清单中剔除
+   * WebSearch：该工具本质是 provider-native web_search 的包装，只有 anthropic kind 能
+   * 编码（见 adapters tool-transform），不支持时子代理也不能持有——allowlist 与
+   * Agent 描述共用此开关，保证模型读到的工具名与实际可用集合一致。
+   */
+  nativeWebSearchSupported?: boolean;
 } = {}): readonly ExploreAgentAllowedTool[] {
-  return options.embeddedSearchEnabled
+  const tools = options.embeddedSearchEnabled
     ? EXPLORE_AGENT_EMBEDDED_SEARCH_ALLOWED_TOOLS
     : EXPLORE_AGENT_ALLOWED_TOOLS;
+  if (options.nativeWebSearchSupported === false) {
+    return tools.filter((tool) => tool !== "WebSearch");
+  }
+  return tools;
 }
 
 export function formatExploreAllowedToolsForAgentDescription(options: {
   embeddedSearchEnabled?: boolean;
+  /** 与 buildExploreAllowedTools 同一开关：不支持时描述中的工具清单同样去掉 WebSearch。 */
+  nativeWebSearchSupported?: boolean;
 } = {}): string {
   const allowedTools = buildExploreAllowedTools(options);
   const allowedToolSet = new Set(allowedTools);

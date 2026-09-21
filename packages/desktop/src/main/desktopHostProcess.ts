@@ -235,6 +235,12 @@ export function spawnHostProcess(
   ];
   const child = electronUtilityProcess.fork(hostModulePath, [], {
     serviceName: formatZCodeHostProcessName(label),
+    // stdio: "pipe" 给 host 配独占的 stdout/stderr 管道，而不是默认 "inherit" 共享
+    // 整个 App 的 stdout fd——继承 fd 的读端随启动方环境关闭（终端退出、管道断裂）
+    // 会让 host 的每次 console 写抛 EPIPE（实测升级为 uncaughtException 杀死 host，
+    // 全部在途 session 冻结）。配 pipe 后 child.stdout/stderr 非空，hostLogRelay 的
+    // raw 兜底通道才真正生效，早期崩溃栈与 native warning 也能被 main 捕获。
+    stdio: "pipe",
     execArgv,
     env: {
       ...buildHostProcessEnv(dependencies.hostProcessLocalEnv),

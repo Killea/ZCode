@@ -58,6 +58,11 @@ export function updateModelDraft(
         projected.contextWindowValue || String(inherited.properties?.contextWindow ?? ""),
       maxOutputTokensValue:
         projected.maxOutputTokensValue || String(inherited.optionSpecs?.maxOutputTokens?.max ?? ""),
+      streamIdleTimeoutValue:
+        projected.streamIdleTimeoutValue ||
+        (inherited.properties?.streamIdleTimeoutMs == null
+          ? ""
+          : String(inherited.properties.streamIdleTimeoutMs / 1000)),
       reasoningLevelMapValue:
         projected.reasoningLevelMapValue || inherited.optionSpecs?.reasoningLevel?.map || "",
       useRecommendedConfigValue: false,
@@ -100,6 +105,7 @@ export function modelDraftOverrides(draft: ProviderModelDraftValues): ReadonlySe
   for (const field of [
     "contextWindowValue",
     "maxOutputTokensValue",
+    "streamIdleTimeoutValue",
     "reasoningLevelMapValue",
   ] as const) {
     if (draft[field].trim()) result.add(field);

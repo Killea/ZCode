@@ -85,9 +85,12 @@ export function createDefaultSubagentPort(
       });
       return undefined;
     },
-    getAllowedTools: () => {
+    getAllowedTools: (_profile, context) => {
       return buildExploreAllowedTools({
         embeddedSearchEnabled: resolveSubagentEmbeddedSearchEnabled(),
+        // 调用方模型不支持 provider-native WebSearch 时子代理同样没有该工具：
+        // WebSearch 只是 provider web_search 的包装，openai-compatible 无法编码。
+        nativeWebSearchSupported: context?.model?.properties.supportsNativeWebSearch,
       });
     },
     runExploreAgent: async (request, options) => {
@@ -165,6 +168,7 @@ export function createDefaultSubagentPort(
         this,
         request,
         childMcpAccess.snapshot?.tools.map((descriptor) => toMcpToolName(descriptor)) ?? [],
+        options?.model,
       );
       validateSubagentMcpRequirements(request, childToolAllowlist, childMcpAccess);
       const childMode = resolveSubagentPermissionMode(
@@ -491,11 +495,19 @@ function resolveSubagentToolAllowlist(
   this: AgentRuntimeInternal,
   request: ExploreSubagentRuntimeRequest,
   visibleMcpToolNames: readonly string[],
+  callerModel?: Model,
 ): readonly string[] {
   const disallowedRules = buildSubagentChildDisallowRules([
     ...(this.config.toolDisallowlist ?? []),
     ...(request.disallowedTools ?? []),
   ]);
+  // 父代理可见工具是子代理工具面的上界：模型不支持的能力（如 supportsNativeWebSearch
+  // 为 false 的 WebSearch）不进入 allowlist。之前这里用无参 getTools() 枚举全量注册表，
+  // 主会话已按模型过滤掉的工具在子代理里仍被放行，模型幻觉调用后撞上
+  // invalid_model_request。callerModel 缺席时退化为全量注册表（旧行为）。
+  const parentVisibleToolNames = new Set(
+    this.getTools(callerModel).map((tool) => tool.name),
+  );
   const inheritsAvailableTools =
     request.allowedTools.length === 0 || request.allowedTools.includes("*");
   if (inheritsAvailableTools) {
@@ -504,7 +516,7 @@ function resolveSubagentToolAllowlist(
       this.config.toolAllowlist,
     );
     const availableToolNames = [
-      ...this.getTools()
+      ...this.getTools(callerModel)
         // child MCP 必须与 parent 启动 snapshot 使用同一批 descriptor，
         // 不能从另一份 registry 视图重新推导。
         .filter((tool) => tool.permission?.permission !== "mcp")
@@ -519,7 +531,9 @@ function resolveSubagentToolAllowlist(
   }
   if (request.allowedTools.length > 0) {
     return appendCoordinatorResponseTool(
-      filterSubagentChildToolNames(request.allowedTools, disallowedRules),
+      filterSubagentChildToolNames(request.allowedTools, disallowedRules).filter(
+        (toolName) => isModelVisibleMcpToolName(toolName) || parentVisibleToolNames.has(toolName),
+      ),
     );
   }
   return appendCoordinatorResponseTool([]);

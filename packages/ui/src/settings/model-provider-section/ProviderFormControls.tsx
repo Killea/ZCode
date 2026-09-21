@@ -66,6 +66,7 @@ export function ModelRowInput({
     | "id"
     | "contextWindow"
     | "maxOutputTokens"
+    | "streamIdleTimeout"
     | "inputFormat"
     | "reasoningLevelValues"
     | "reasoningLevelMap"

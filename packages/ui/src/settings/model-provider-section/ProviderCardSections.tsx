@@ -385,6 +385,7 @@ export function ProviderModelsSection({
     | "id"
     | "contextWindow"
     | "maxOutputTokens"
+    | "streamIdleTimeout"
     | "inputFormat"
     | "reasoningLevelValues"
     | "reasoningLevelMap"

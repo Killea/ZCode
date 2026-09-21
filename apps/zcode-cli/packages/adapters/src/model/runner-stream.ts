@@ -134,8 +134,10 @@ export async function* runStreamText(input: {
     const startedAt = Date.now();
     // SSE idle timeout 后的重试如果仍固定首请求窗口，容易被同一段 provider 静默窗口反复打断；
     // core recovery 和 adapter 内部 retry 都统一按重试次数每次增加 30s。
+    // 模型级 properties.streamIdleTimeoutMs 优先于进程级默认：本地推理/排队慢的模型
+    // （openai-compatible 自托管）需要更长的等待窗口，见 docs/model-stream-idle-timeout.md。
     const streamIdleTimeoutMs = resolveModelStreamIdleTimeoutMs({
-      baseTimeoutMs: input.streamIdleTimeoutMs,
+      baseTimeoutMs: input.resolved.properties.streamIdleTimeoutMs ?? input.streamIdleTimeoutMs,
       retryNumber: (input.request.streamIdleTimeoutRetryNumber ?? 0) + retryBudgetAttempt - 1,
     });
     let emittedEvent = false;

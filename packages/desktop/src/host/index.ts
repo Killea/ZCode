@@ -281,6 +281,30 @@ const rawConsole = {
   error: console.error.bind(console),
 };
 
+// stdout/stderr 只是 main 侧 hostLogRelay 的旁路日志通道；宿主真正的 RPC 走
+// parentPort。管道读端一旦关闭，同步 write 会抛 EPIPE、异步失败会以 stream 'error'
+// 事件抛出——任一路径未兜住都会升级成 uncaughtException 杀掉整个 host
+// （实测：writeHostLog → console.log → write EPIPE → exit(1)，窗口内全部
+// session/subagent 在途任务冻结，UI 停在 waiting）。这里把写失败降级为静默降级：
+// 标记管道已断、后续写跳过，日志仍经 parentPort 上报。
+let hostStdioBroken = false;
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on("error", () => {
+    hostStdioBroken = true;
+  });
+}
+
+function safeRawConsoleWrite(consoleFn: (...args: unknown[]) => void, args: unknown[]): void {
+  if (hostStdioBroken) {
+    return;
+  }
+  try {
+    consoleFn(...args);
+  } catch {
+    hostStdioBroken = true;
+  }
+}
+
 const remoteConnectionProgressContext = createRemoteConnectionProgressContext({
   emit: ({ requestId, level, args }) => {
     if (!parentPort) {
@@ -303,7 +327,7 @@ function writeHostLog(level: HostLogLevel, ...args: unknown[]): void {
   const prefix = formatLogPrefix("zcode-host", process.pid);
   const consoleFn =
     level === "error" ? rawConsole.error : level === "warn" ? rawConsole.warn : rawConsole.log;
-  consoleFn(prefix, ...args);
+  safeRawConsoleWrite(consoleFn, [prefix, ...args]);
   reportHostLog(level, [prefix, ...args]);
 }
 
@@ -1538,19 +1562,19 @@ function formatRemoteTargetForLog(target: RemoteTarget): string {
 }
 
 console.log = (...args: unknown[]) => {
-  rawConsole.log(...args);
+  safeRawConsoleWrite(rawConsole.log, args);
   reportHostLog("info", args);
   remoteConnectionProgressContext.report("info", args);
 };
 
 console.warn = (...args: unknown[]) => {
-  rawConsole.warn(...args);
+  safeRawConsoleWrite(rawConsole.warn, args);
   reportHostLog("warn", args);
   remoteConnectionProgressContext.report("warn", args);
 };
 
 console.error = (...args: unknown[]) => {
-  rawConsole.error(...args);
+  safeRawConsoleWrite(rawConsole.error, args);
   // Electron 会把 Node warning 先走 console.error，而 process warning listener 随后还会
   // 结构化记录 warn；若这里继续上报，就会为同一个 warning 留下一条 error 和一条 warn。
   if (!shouldReportHostConsoleError(args)) {
@@ -2250,8 +2274,9 @@ process.on(
   createHostUncaughtExceptionHandler({
     onRecovered: (error, origin) => {
       const memoryUsage = process.memoryUsage();
-      logger.warn("contained host allocation failure from native TLS callback", {
+      logger.warn("contained recoverable host exception", {
         arrayBuffers: memoryUsage.arrayBuffers,
+        code: (error as NodeJS.ErrnoException).code,
         external: memoryUsage.external,
         heapUsed: memoryUsage.heapUsed,
         message: error.message,

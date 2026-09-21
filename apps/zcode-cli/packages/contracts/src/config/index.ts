@@ -281,7 +281,10 @@ export type UiLocale = SupportedLocale | "auto";
 export type UiThemeMode = "dark" | "light";
 export type UiThemePreference = UiThemeMode | "auto";
 
-export const DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS = 600_000;
+// 默认 30 分钟：本地推理模型在并发子代理请求下可能长时间排队才产出首个 SSE 事件，
+// 原 10 分钟上限会把可恢复的排队等待误判为流停滞。模型级覆盖见
+// properties.streamIdleTimeoutMs（docs/model-stream-idle-timeout.md）。
+export const DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS = 1_800_000;
 
 export interface ModelStreamConfig {
   idleTimeoutMs: number;

@@ -3028,6 +3028,8 @@ const enUS: Record<string, string> = {
     "The context capacity the model can process at once, in tokens. ZCode uses this to manage context.\nDo not exceed the model's actual limit.",
   "settings.modelProvider.help.maxOutputTokens":
     "The maximum number of tokens a single model request may generate.\nDo not exceed the model's actual limit.",
+  "settings.modelProvider.help.streamIdleTimeout":
+    "How long ZCode waits for any event on a model's streaming response before retrying, in seconds.\nThis also covers the time a request spends queued or thinking on the provider. Increase it for slow local inference; the default is 1800 (30 minutes). Leave empty to use the default.",
   "settings.modelProvider.help.inputModalities":
     "Set the content types the model can receive:\n\n- **Text**: Receives text content. Required.\n- **Images**: Receives image content.\n- **Video**: Receives video content.\n- **PDF**: Receives PDF documents directly.",
   "settings.modelProvider.help.outputModalities":
@@ -3076,6 +3078,7 @@ const enUS: Record<string, string> = {
   "settings.modelProvider.reasoning": "Reasoning settings",
   "settings.hooks.advanced": "Advanced",
   "settings.modelProvider.maxOutputTokens": "Max output tokens",
+  "settings.modelProvider.streamIdleTimeout": "Stream idle timeout (seconds)",
   "settings.modelProvider.inputModalities": "Input types",
   "settings.modelProvider.outputModalities": "Output types",
   "settings.modelProvider.modality.text": "Text",
@@ -3089,6 +3092,8 @@ const enUS: Record<string, string> = {
     "Context window must be a positive integer",
   "settings.modelProvider.modelMetadata.invalid.maxOutputTokens":
     "Max output tokens must be a positive integer",
+  "settings.modelProvider.modelMetadata.invalid.streamIdleTimeout":
+    "Stream idle timeout must be a positive integer number of seconds",
   "settings.modelProvider.modelMetadata.invalid.inputModalities": "Text input type is required",
   "settings.modelProvider.newProviderName": "New provider",
   "settings.modelProvider.modelsPlaceholder": "One model name per line",

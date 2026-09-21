@@ -22,6 +22,7 @@ import {
   type AgentCompletedOutput,
   type AgentOutput,
   type Logger,
+  type Model,
   type ModelUsage,
   type SessionEvent,
   type SessionId,
@@ -122,7 +123,15 @@ export interface ExploreSubagentPortOptions {
   >;
   runtimeTaskRegistry?: RuntimeTaskRegistry;
   createAgentId?: () => string;
-  getAllowedTools?: (profile: AgentProfile) => readonly string[];
+  /**
+   * `context.model` 是发起调用的父 turn 模型：子代理工具面按调用方模型能力收口
+   * （如 supportsNativeWebSearch=false 时内置 Explore 清单不含 WebSearch）。
+   * 缺席代表无模型上下文，返回全量清单（旧行为）。
+   */
+  getAllowedTools?: (
+    profile: AgentProfile,
+    context?: { model?: Model },
+  ) => readonly string[];
   inactivityTimeoutMs?: number;
   autoBackgroundMs?: number;
   logger?: Logger;
@@ -245,7 +254,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
                 prompt: request.prompt,
                 parentToolCallId: request.parentToolCallId,
                 status: "running",
-                allowedTools: [...resolveAllowedTools(profile, options)],
+                allowedTools: [...resolveAllowedTools(profile, options, runOptions?.model)],
                 model: profile.modelSelection
                   ? `${profile.modelSelection.providerId}/${profile.modelSelection.modelId}`
                   : undefined,
@@ -492,7 +501,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
                 prompt: request.prompt,
                 parentToolCallId: request.parentToolCallId,
                 status: "running",
-                allowedTools: [...resolveAllowedTools(profile, options)],
+                allowedTools: [...resolveAllowedTools(profile, options, startOptions?.model)],
                 outputFile: lifecycle.outputFile,
                 model: profile.modelSelection
                   ? `${profile.modelSelection.providerId}/${profile.modelSelection.modelId}`
@@ -1132,7 +1141,7 @@ async function runAgentToCompletion(
     {
       agentId: lifecycle.agentId,
       agentType: request.agentType,
-      allowedTools: resolveAllowedTools(lifecycle.profile, options),
+      allowedTools: resolveAllowedTools(lifecycle.profile, options, runOptions?.model),
       // 显式 background Agent 的 child tool 会被镜像到父会话；
       // 过去丢失这个来源会让父 turn 把仍在运行的 child tool 误当前台孤儿收口。这里必须
       // 保留 getter，foreground 后续转后台时，每条 mirror event 才会读取 registry 当前值，
@@ -2124,9 +2133,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function resolveAllowedTools(
   profile: AgentProfile,
   options: ExploreSubagentPortOptions,
+  model?: Model,
 ): readonly string[] {
   const profileTools = isBuiltInExploreAgentProfile(profile)
-    ? (options.getAllowedTools?.(profile) ?? EXPLORE_AGENT_ALLOWED_TOOLS)
+    ? (options.getAllowedTools?.(profile, { model }) ?? EXPLORE_AGENT_ALLOWED_TOOLS)
     : profile.tools;
   const baseTools = [...(profileTools ?? [])];
   const disallowed = new Set(profile.disallowedTools ?? []);
