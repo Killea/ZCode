@@ -796,7 +796,7 @@ export const WorkspaceSidebarItem = memo(function WorkspaceSidebarItem({
           colorVariant="colorful"
           duration={1.96}
           active={shouldShowRemoteConnectingBorderBeam}
-          borderRadius={8}
+          borderRadius={0}
         >
           <div
             className={cn(

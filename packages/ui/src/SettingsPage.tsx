@@ -1566,8 +1566,8 @@ export function SettingsPage({
               data-settings-panel-frame="true"
               className={cn(
                 "relative flex flex-col min-h-0 h-full border border-border bg-background",
-                // Windows 设置页已有 4px 外层留白，不再承担系统窗口外沿；圆角与主工作区统一为 5px。
-                isWindowsDesktop ? "rounded-[5px]" : "rounded-xl",
+                // 界面直角化（DESIGN.md「Radius」）：设置页面板与主工作区统一 0px。
+                "rounded-none",
               )}
             >
               {!usesInlineWindowControls ? (

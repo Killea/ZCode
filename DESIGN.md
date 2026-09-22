@@ -176,7 +176,7 @@ The dynamic-workflow timeline draws with a feature-scoped token family:
 - Never replace semantic tokens with ad hoc values like `text-white/60`, `border-white/10`, or arbitrary neutral alpha fills.
 
 - `DesktopWindowFrame` uses `bg-background-alt` on macOS desktop. Windows, Linux, and Web keep `bg-background-win-alt`; child surface colors remain independent.
-- Linux desktop uses a `16px` outer window-shell radius around the `12px` workspace panels and their `4px` outer inset. Keep the shell radius and compositor clip path equal; maximized windows use `0px`.
+- The desktop window shell and workspace panels are square (`0px` radius) on all platforms; the `4px` outer inset is unchanged. On macOS the native window rounding lives outside the inset and needs no inner counterpart.
 
 ## Typography
 
@@ -282,64 +282,20 @@ Spacing rules:
 
 ## Radius
 
-Radius follows the nesting of visible rounded containers, not component importance or layout depth. These rules are the target specification; existing component defaults may still need migration.
+The interface is square: all container, control, dialog, menu, and overlay corners are `0px`.
+The `--radius-*` theme tokens (`sm` through `3xl`) are defined as `0px`, so the `rounded-sm` →
+`rounded-3xl` utility classes still resolve but produce no rounding; do not add arbitrary
+`rounded-[Npx]` values to reintroduce corners.
 
-### Container hierarchy
+### Shape exceptions
 
-- Layout regions, ordinary wrappers, groups, and separators do not count as radius levels.
-- The first rounded container starts at `rounded-xl`, whether inside or outside a layout region.
-- Nested rounded containers step down through `rounded-lg` → `rounded-md` → `rounded-sm`; `rounded-sm` is the minimum.
-- Count the nearest actual rounded container, not intermediate DOM wrappers. Peer containers at the same level use the same radius.
-- Cards, chat bubbles, tool blocks, and ordinary composite input shells follow this hierarchy; size or importance alone does not justify `rounded-2xl`.
-
-### Approved 2xl exceptions
-
-The following explicit exceptions may retain `rounded-2xl`; do not extend them to other components based only on size or importance:
-
-- **Main chat input shell**: the actual `ChatPromptEditor` input shell may use `rounded-2xl`. Its drag overlay matches the shell because it covers the same surface, rather than introducing a nested container.
-- **Conversation status floating panel**: the shared shell may retain `rounded-2xl` across collapsed and expanded presentations.
-- **Toast**: the independent notification shell may retain `rounded-2xl`.
-- **Brand icon backplates**: welcome-screen brand art and plugin-detail icons may retain `rounded-2xl` as part of their icon shape. This is not a general exception for icon buttons or content cards.
-
-The main composer region, including its context-header layout wrapper, is layout and does not count as a radius level. Its existing decorative radius does not force the actual input shell down a level. This classification alone does not prescribe changing the layout wrapper's decorative radius.
-
-These exceptions do not automatically grant `2xl` to nested controls or content containers. Basic controls still use the table below. Dialog shells follow their separate rules.
-
-### Basic controls
-
-Buttons, menu trigger buttons, ordinary Input, Textarea, and Select triggers default to `rounded-lg`. Adjust them according to the nearest rounded parent container:
-
-| Nearest rounded parent          | Control radius |
-| ------------------------------- | -------------- |
-| None, or `rounded-xl` and above | `rounded-lg`   |
-| `rounded-lg`                    | `rounded-md`   |
-| `rounded-md` / `rounded-sm`     | `rounded-sm`   |
-
-Control size and primary/secondary action emphasis do not independently change radius.
-
-### Dialogs
-
-- Dialog shells, including alert and confirmation dialogs, use `rounded-2xl`.
-- Only chat attachment preview, feedback screenshot preview, and CUA screenshot preview dialogs keep `rounded-xl` shells.
-- The dialog shell does not count toward its content hierarchy. The first rounded content container starts again at `rounded-xl`, followed by `rounded-lg` → `rounded-md` → `rounded-sm`.
-- Basic controls inside dialogs follow the control table; a layout wrapper does not introduce an extra level.
-
-### Menus and selection overlays
-
-- Dropdown menus, context menus, Select expanded panels, and similar option/action overlays use `rounded-lg` shells. This includes the main input's `@` / `/` suggestion panel; it does not inherit the main-input exception.
-- Menu items and option hover/selected backgrounds use `rounded-md`.
-- Rounded containers or controls nested inside an option use `rounded-sm`.
-- Each submenu is an independent overlay: its shell restarts at `rounded-lg`, and its options use `rounded-md`.
-- Overlay radius does not inherit the trigger's parent hierarchy. Triggers themselves follow the basic-control table.
-- Other standalone popover containers follow the ordinary container hierarchy, starting at `rounded-xl`.
-
-### Shape exceptions and consistency
-
-- `rounded-full` is reserved exclusively for deliberate pill shapes or circles.
-- Buttons, tags, counters, and icon buttons do not qualify for `rounded-full` merely because of their component type.
-- Do not introduce arbitrary radius values or use the ambiguous bare `rounded` utility.
-- Use `rounded-none` or side-specific radius removal only where joined surfaces must form a continuous shape.
-- Apply the same rules on desktop and mobile Web, across platforms and themes.
+- `rounded-full` (`9999px`) remains available exclusively for deliberate pill shapes and true
+  circles: status dots, avatars, spinner rings, and similar geometry whose shape is the circle
+  itself. It must not be used to soften rectangular surfaces.
+- Decorative hairline indicators (for example resize-handle lines) may keep rounded end caps;
+  they are stroke caps, not container corners.
+- The desktop window shell, workspace panels, the startup logo backplate, and auxiliary native
+  windows are square on all platforms, including maximized and floating states.
 
 ## Sizing
 

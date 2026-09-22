@@ -141,8 +141,8 @@ import {
   focusWorkspaceInExistingWindow,
   showCurrentWindowFromDock,
   syncApplicationUnreadBadge,
-  handleDesktopWindowCloseRequest,
 } from "./desktopWindowLifecycle.js";
+import { handleDesktopWindowCloseRequest } from "./desktopWindowCloseRequest.js";
 import { resolveZCodeBuiltinProviderConfigFilePath } from "./desktopProviderConfig.js";
 import {
   getCredentialsDir,

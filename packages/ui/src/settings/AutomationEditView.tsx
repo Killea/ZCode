@@ -216,7 +216,7 @@ function pad2(value: number): string {
 const CUSTOM_REPEAT_SELECT_CONTENT_CLASS =
   "w-[var(--radix-select-trigger-width)] px-0 py-1.5 [&_[data-position=popper]]:px-1 [&_[data-slot=select-scroll-up-button]]:hidden [&_[data-slot=select-scroll-down-button]]:hidden";
 const CUSTOM_REPEAT_SELECT_ITEM_CLASS =
-  "min-h-8 rounded-[8px] px-2 py-1.5 pr-8 text-ui-base leading-5 text-foreground-subtle data-[highlighted]:bg-menu-hover data-[highlighted]:text-foreground data-[state=checked]:bg-menu-hover data-[state=checked]:text-foreground";
+  "min-h-8 rounded-none px-2 py-1.5 pr-8 text-ui-base leading-5 text-foreground-subtle data-[highlighted]:bg-menu-hover data-[highlighted]:text-foreground data-[state=checked]:bg-menu-hover data-[state=checked]:text-foreground";
 
 function CustomRepeatSelectIndicator() {
   return (
@@ -607,7 +607,7 @@ function EndDatePicker({
                   setOpen(false);
                 }}
                 className={cn(
-                  "flex size-8 items-center justify-center rounded-[8px] text-ui-base tabular-nums transition-colors",
+                  "flex size-8 items-center justify-center rounded-none text-ui-base tabular-nums transition-colors",
                   selected
                     ? "bg-primary text-primary-foreground"
                     : "text-foreground hover:bg-menu-hover",
@@ -703,7 +703,7 @@ function CustomRepeatDialog({
             <button
               type="button"
               aria-label={intl.formatMessage({ id: "common.close" })}
-              className="absolute right-5 top-5 flex size-6 items-center justify-center rounded-[6px] opacity-80 transition-colors hover:bg-surface-hover hover:opacity-100"
+              className="absolute right-5 top-5 flex size-6 items-center justify-center rounded-none opacity-80 transition-colors hover:bg-surface-hover hover:opacity-100"
             >
               <X className="size-4" strokeWidth={2} aria-hidden="true" />
             </button>
@@ -774,7 +774,7 @@ function CustomRepeatDialog({
                 }}
               >
                 <SelectTrigger
-                  className="h-9 w-full rounded-[8px] px-3 text-ui-base leading-5 tracking-[-0.18px] hover:bg-input/80 data-[state=open]:border-input-border-hover data-[state=open]:bg-input/80"
+                  className="h-9 w-full rounded-none px-3 text-ui-base leading-5 tracking-[-0.18px] hover:bg-input/80 data-[state=open]:border-input-border-hover data-[state=open]:bg-input/80"
                   data-testid={TID_AUTOMATION_CUSTOM_UNIT_SELECT}
                   indicator={<CustomRepeatSelectIndicator />}
                 >
@@ -886,7 +886,7 @@ function CustomRepeatDialog({
                   }
                 >
                   <SelectTrigger
-                    className="h-9 w-32 rounded-[8px] px-3 text-ui-base hover:bg-input/80 data-[state=open]:border-input-border-hover data-[state=open]:bg-input/80"
+                    className="h-9 w-32 rounded-none px-3 text-ui-base hover:bg-input/80 data-[state=open]:border-input-border-hover data-[state=open]:bg-input/80"
                     indicator={<CustomRepeatSelectIndicator />}
                   >
                     <SelectValue />
@@ -929,7 +929,7 @@ function CustomRepeatDialog({
                           );
                         }}
                         className={cn(
-                          "flex h-7 w-full items-center justify-center rounded-[8px] border text-ui-sm",
+                          "flex h-7 w-full items-center justify-center rounded-none border text-ui-sm",
                           active
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-border hover:bg-surface-hover",
@@ -975,7 +975,7 @@ function CustomRepeatDialog({
               <button
                 type="button"
                 onClick={() => setEnds(false)}
-                className="flex h-9 items-center gap-2 rounded-[8px] px-2 text-ui-base leading-5 tracking-[-0.18px] transition-colors hover:bg-surface-hover"
+                className="flex h-9 items-center gap-2 rounded-none px-2 text-ui-base leading-5 tracking-[-0.18px] transition-colors hover:bg-surface-hover"
               >
                 <span className="flex size-5 items-center justify-center">
                   <span
@@ -994,7 +994,7 @@ function CustomRepeatDialog({
               <button
                 type="button"
                 onClick={() => setEnds(true)}
-                className="flex h-9 items-center gap-2 rounded-[8px] px-2 text-ui-base leading-5 tracking-[-0.18px] transition-colors hover:bg-surface-hover"
+                className="flex h-9 items-center gap-2 rounded-none px-2 text-ui-base leading-5 tracking-[-0.18px] transition-colors hover:bg-surface-hover"
               >
                 <span className="flex size-5 items-center justify-center">
                   <span
@@ -1027,14 +1027,14 @@ function CustomRepeatDialog({
             <Button
               type="button"
               variant="outline"
-              className="h-9 rounded-[8px] px-4 text-ui-base font-medium leading-5 tracking-[-0.18px] hover:border-border-hover hover:bg-input/50"
+              className="h-9 rounded-none px-4 text-ui-base font-medium leading-5 tracking-[-0.18px] hover:border-border-hover hover:bg-input/50"
             >
               {intl.formatMessage({ id: "common.cancel" })}
             </Button>
           </DialogClose>
           <Button
             type="button"
-            className="h-9 rounded-[8px] px-4 text-ui-base font-medium leading-5 tracking-[-0.18px] hover:bg-primary/80"
+            className="h-9 rounded-none px-4 text-ui-base font-medium leading-5 tracking-[-0.18px] hover:bg-primary/80"
             data-testid={TID_AUTOMATION_CUSTOM_CONFIRM}
             disabled={!isIntervalValid || (ends && !localDateEndTimestamp(endDate))}
             onClick={() => {
@@ -2748,7 +2748,7 @@ export function AutomationEditView({
                 {intl.formatMessage({ id: "automations.runs.empty" })}
               </AutomationHistoryEmptyState>
             ) : (
-              <div className="overflow-x-auto rounded-[8px]">
+              <div className="overflow-x-auto rounded-none">
                 {/* 运行历史使用可缩放字号，不能继续绑定固定 18px 行高。*/}
                 <table className="w-full text-left text-ui-base font-normal leading-normal tracking-[-0.08px]">
                   <thead className="bg-surface text-foreground-subtle">
@@ -2845,7 +2845,7 @@ export function AutomationEditView({
                                       aria-label={intl.formatMessage({
                                         id: "automations.moreActions",
                                       })}
-                                      className="flex size-6 items-center justify-center rounded-[6px] text-foreground-subtle transition-colors hover:bg-white/10 hover:text-foreground data-[state=open]:bg-white/10 data-[state=open]:text-foreground"
+                                      className="flex size-6 items-center justify-center rounded-none text-foreground-subtle transition-colors hover:bg-white/10 hover:text-foreground data-[state=open]:bg-white/10 data-[state=open]:text-foreground"
                                     >
                                       <AutomationMoreHorizontalIcon
                                         className="size-4"
@@ -2925,7 +2925,7 @@ export function AutomationEditView({
                         aria-current={item === runsCurrentPage ? "page" : undefined}
                         onClick={() => setRunsPage(item)}
                         className={cn(
-                          "inline-flex size-7 items-center justify-center rounded-[6px] transition-colors",
+                          "inline-flex size-7 items-center justify-center rounded-none transition-colors",
                           item === runsCurrentPage
                             ? "bg-surface text-foreground"
                             : "text-foreground-subtle hover:bg-surface-hover hover:text-foreground",

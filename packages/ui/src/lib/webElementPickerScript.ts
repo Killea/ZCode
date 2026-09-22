@@ -331,7 +331,7 @@ function webElementPickerScript(options: WebElementPickerScriptOptions) {
   Object.assign(overlay.style, {
     background: "rgba(37, 99, 235, 0.12)",
     border: "2px solid #2563eb",
-    borderRadius: "4px",
+    borderRadius: "0",
     boxShadow: "0 0 0 9999px rgba(15, 23, 42, 0.10)",
     boxSizing: "border-box",
     display: "none",
@@ -347,7 +347,7 @@ function webElementPickerScript(options: WebElementPickerScriptOptions) {
     backdropFilter: "blur(10px)",
     background: "rgba(17, 24, 39, 0.92)",
     border: "1px solid rgba(255, 255, 255, 0.14)",
-    borderRadius: "18px",
+    borderRadius: "0",
     boxShadow: "0 18px 38px rgba(15, 23, 42, 0.28)",
     boxSizing: "border-box",
     color: "#f9fafb",

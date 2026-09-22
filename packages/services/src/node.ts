@@ -2274,6 +2274,11 @@ export function createLocalServices(options: {
     agentService: zcodeAgentService,
     taskIndexRepo,
   });
+  // 活跃会话计数投影是 desktop 退出确认的唯一本地数据源（docs/app-quit-confirmation.md）；
+  // reporter 由宿主注入，远端 server 宿主不注入时自然静默。
+  zcodeTaskIndexSyncer.onRunningSessionCountChanged((count) => {
+    options?.taskRuntimeReporter?.onRunningTaskCountChanged({ runningTaskCount: count });
+  });
   // The plugin can be toggled at runtime. Do not let a previously created resolver continue
   // health-checking/restarting Helper after disable, and create it lazily after enable.
   // 动态 resolver：isPluginEnabled 与 helper 创建用同一个 isCuaEnabledForContext 门控（dev mode 一致），

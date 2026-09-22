@@ -1102,16 +1102,13 @@ const runtimeProcessLifecycleReporter = {
   },
 } satisfies NonNullable<Parameters<typeof createLocalServices>[0]>["processLifecycleReporter"];
 
+// services 层上报的本地 runtime 活跃会话数（sessions-index 投影，见
+// docs/app-quit-confirmation.md）；与远程代理计数/未跟踪 RPC 求和后统一上报 main。
+let localRuntimeRunningSessionCount = 0;
 const runtimeTaskReporter = {
   onRunningTaskCountChanged(event) {
-    if (!parentPort) {
-      return;
-    }
-
-    parentPort.postMessage({
-      type: HostResponseTypes.AgentRunningTaskCountChanged,
-      runningTaskCount: event.runningTaskCount,
-    });
+    localRuntimeRunningSessionCount = event.runningTaskCount;
+    reportHostRunningTaskCount();
   },
 } satisfies NonNullable<Parameters<typeof createLocalServices>[0]>["taskRuntimeReporter"];
 
@@ -1128,9 +1125,18 @@ const cuaOperationStateReporter = {
 } satisfies NonNullable<Parameters<typeof createLocalServices>[0]>["cuaOperationStateReporter"];
 
 let untrackedPromptRpcCount = 0;
+// host 是 AgentRunningTaskCountChanged 的唯一写方：本地会话 + 远程代理任务 + 未跟踪 RPC 三路求和。
 function reportHostRunningTaskCount(): void {
-  runtimeTaskReporter.onRunningTaskCountChanged({
-    runningTaskCount: workspaceTaskTracker.getTotalRunningTaskCount() + untrackedPromptRpcCount,
+  if (!parentPort) {
+    return;
+  }
+
+  parentPort.postMessage({
+    type: HostResponseTypes.AgentRunningTaskCountChanged,
+    runningTaskCount:
+      localRuntimeRunningSessionCount +
+      workspaceTaskTracker.getTotalRunningTaskCount() +
+      untrackedPromptRpcCount,
   });
 }
 

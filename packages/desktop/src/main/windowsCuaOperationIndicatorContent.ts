@@ -49,7 +49,7 @@ function indicatorHtml(locale: Locale): string {
       display: flex; align-items: center; justify-content: center; gap: 10px;
       width: 100%; height: 38px; padding: 0 18px;
       color: #202124; background: rgba(255, 255, 255, 0.96);
-      border: 1px solid rgba(15, 23, 42, 0.14); border-radius: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.14); border-radius: 0;
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 6px 12px -6px rgba(15, 23, 42, 0.18);
       font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap;
       opacity: 1; transform: translateY(0);

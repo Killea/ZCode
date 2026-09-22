@@ -95,7 +95,7 @@ export function createCustomAboutDialogHtml(input: CustomAboutDialogHtmlInput): 
         align-items: center;
         justify-content: center;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
+        border-radius: 0;
         background: linear-gradient(180deg, #000000 0%, #151718 100%);
         color: #ffffff;
         box-shadow: 0 10px 13px -3px rgb(0 0 0 / 0.2), 0 4px 5px -3px rgb(0 0 0 / 0.2);
@@ -132,7 +132,7 @@ export function createCustomAboutDialogHtml(input: CustomAboutDialogHtmlInput): 
         width: 100%;
         height: 36px;
         border: 0;
-        border-radius: 18px;
+        border-radius: 0;
         background: var(--about-primary);
         color: var(--about-primary-foreground);
         font: inherit;

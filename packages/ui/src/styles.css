@@ -155,6 +155,15 @@ body {
   --text-mobile-input-safe: 16px;
   --animated-gradient-text-strong: rgba(10, 10, 10, 1);
   --animated-gradient-text-soft: rgba(10, 10, 10, 0.22);
+  /* 界面直角化（DESIGN.md「Radius」）：圆角层级整体归零，rounded-sm..3xl 全部失效；
+     --radius-full 保留 9999px，仅给状态点/头像等真圆形元素使用；rounded-xs 小徽标同样直角。 */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
   --color-background: var(--color-neutral-50);
   --color-background-alt: color-mix(in oklab, var(--color-neutral-100) 60%, transparent);
   --color-background-win-alt: var(--color-neutral-200);
@@ -772,7 +781,7 @@ body {
   min-height: 32px;
   min-width: 32px;
   border: 3px solid transparent;
-  border-radius: 9999px;
+  border-radius: 0;
   background: var(--color-border);
   background-clip: padding-box;
 }
@@ -1294,7 +1303,7 @@ body {
 
 [data-fork-highlight="true"] {
   animation: fork-highlight-pulse 1.6s ease-out 1;
-  border-radius: 0.5rem;
+  border-radius: 0;
 }
 
 /* 走马灯文字从两侧进出时只保留右侧渐隐，左边缘会出现硬切。 */
@@ -1468,12 +1477,12 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: 0.5rem;
+  border-radius: 0;
 }
 .wf-tile:has(.wf-tile-hit:focus-visible) {
   outline: 2px solid color-mix(in oklab, var(--color-ring) 40%, transparent);
   outline-offset: 2px;
-  border-radius: 0.5rem;
+  border-radius: 0;
 }
 .wf-tile-frame {
   transition:

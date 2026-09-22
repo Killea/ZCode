@@ -162,7 +162,7 @@ function renderForceUpdatePromptHtml(text: ForceUpdateDialogText, locale: Locale
     .brand-icon {
       width: 22px;
       height: 22px;
-      border-radius: 6px;
+      border-radius: 0;
       background: #ebf4ff;
       border: 1px solid rgba(13, 13, 13, 0.1);
       display: flex;
@@ -173,7 +173,7 @@ function renderForceUpdatePromptHtml(text: ForceUpdateDialogText, locale: Locale
       font-size: 12px;
       font-weight: 600;
     }
-    .brand-icon img { width: 100%; height: 100%; border-radius: 6px; }
+    .brand-icon img { width: 100%; height: 100%; border-radius: 0; }
     .brand-title { font-size: 13px; font-weight: 500; color: #0d0d0d; }
     .close {
       position: absolute;
@@ -218,7 +218,7 @@ function renderForceUpdatePromptHtml(text: ForceUpdateDialogText, locale: Locale
     .status-icon {
       width: 36px;
       height: 36px;
-      border-radius: 10px;
+      border-radius: 0;
       background: color-mix(in oklab, #0b7fff 12%, transparent);
       border: 1px solid rgba(13, 13, 13, 0.1);
       color: #0b7fff;
@@ -233,7 +233,7 @@ function renderForceUpdatePromptHtml(text: ForceUpdateDialogText, locale: Locale
     .version-card {
       border: 1px solid rgba(13, 13, 13, 0.1);
       background: #f0f0f0;
-      border-radius: 12px;
+      border-radius: 0;
       padding: 12px 14px;
       color: #0d0d0d;
       font-size: 13px;
@@ -243,7 +243,7 @@ function renderForceUpdatePromptHtml(text: ForceUpdateDialogText, locale: Locale
     .version-row { white-space: pre-wrap; }
     .progress { display: none; gap: 8px; flex-direction: column; }
     .progress.visible { display: flex; }
-    .progress-track { height: 6px; border-radius: 999px; background: rgba(13, 13, 13, 0.08); overflow: hidden; }
+    .progress-track { height: 6px; border-radius: 0; background: rgba(13, 13, 13, 0.08); overflow: hidden; }
     .progress-bar { width: 0%; height: 100%; border-radius: inherit; background: #0b7fff; transition: width 160ms ease; }
     .progress-text { color: rgba(13, 13, 13, 0.62); font-size: 12px; }
     .actions {
@@ -259,7 +259,7 @@ function renderForceUpdatePromptHtml(text: ForceUpdateDialogText, locale: Locale
       border: 1px solid rgba(13, 13, 13, 0.1);
       background: #ffffff;
       color: #0d0d0d;
-      border-radius: 6px;
+      border-radius: 0;
       padding: 0 12px;
       font-size: 13px;
       font-weight: 500;
