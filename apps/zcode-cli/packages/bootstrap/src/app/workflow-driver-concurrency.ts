@@ -28,9 +28,10 @@ import {
   type WorkflowConcurrencyPort,
 } from "./workflow-concurrency-governor.js";
 
-/** 与治理器同一条纪律：这两种 retry 不是 provider 失败，不值一个徽标。 */
+/** 与治理器同一条纪律：这几种 retry 不是 provider 失败，不值一个徽标。 */
 const NON_FAILURE_RETRY_REASONS: ReadonlySet<string> = new Set([
   "reasoning_signature_repair",
+  "input_modality_repair",
   "auth_refresh",
 ]);
 
@@ -95,7 +96,7 @@ interface Chain {
  * 聚合规则（取代单相位）：driver 为每个 actor 维护在飞请求链的集合——
  *   - `model_request_queued`（`tryAcquire` 未命中）→ 链 queued；
  *   - `model_request_admitted` / `model_request_started` → 链 executing；
- *   - `model_retry_scheduled`（`reasoning_signature_repair` / `auth_refresh` 除外）→ 链 backoff；
+ *   - `model_retry_scheduled`（`reasoning_signature_repair` / `input_modality_repair` / `auth_refresh` 除外）→ 链 backoff；
  *   - `model_request_completed` / 不可重试的 `model_request_failed` → 链结束（出集合）。
  * 子代理相位：任一链 executing → executing；否则有链在等 → waiting（带最近一条等待信息）；集合为空 →
  * 保持上一相位、不发事件（同一 ask 内工具执行期间，工具自己不排队时子代理仍显示 executing）。

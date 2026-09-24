@@ -22,6 +22,13 @@ import {
   unwrapRetryError,
 } from "./failure-inspection.js";
 import { offPeakTicketExpiredMessage, resolveOffPeakFailureDecision } from "./offpeak-retry.js";
+import {
+  MAX_INPUT_MODALITY_REPAIR_ATTEMPTS,
+  modalitiesCoveredByRejection,
+  projectRejectedInputModality,
+  rejectedInputModalityFromError,
+  type RejectedInputModality,
+} from "./modality-rejection-repair.js";
 import { isRetrySafePreludeStreamEvent } from "./stream-retry-boundary.js";
 import {
   createLinkedAbortController,
@@ -118,6 +125,10 @@ export async function* runStreamText(input: {
   const isDev = isDevelopmentModelIOEnv(input.env);
   let requestMessages = input.request.messages;
   let signatureRepairAttempted = false;
+  // 模态修复记账：provider 每明确拒绝一种输入模态，给一次不占预算的重发机会
+  // （同一 kind 不重复修；总次数封顶，见 docs/model-input-modality-repair.md）。
+  const repairedInputModalities = new Set<RejectedInputModality>();
+  let modalityRepairCount = 0;
   let emptyCompletionRetryCount = 0;
 
   for (
@@ -125,12 +136,12 @@ export async function* runStreamText(input: {
     retryAttemptLoopContinues(
       retryBudget,
       attempt,
-      input.retry.maxAttempts + Number(signatureRepairAttempted),
+      input.retry.maxAttempts + Number(signatureRepairAttempted) + modalityRepairCount,
     );
     attempt += 1
   ) {
     const retryBudgetAttempt =
-      attempt - Number(signatureRepairAttempted);
+      attempt - Number(signatureRepairAttempted) - modalityRepairCount;
     const startedAt = Date.now();
     // SSE idle timeout 后的重试如果仍固定首请求窗口，容易被同一段 provider 静默窗口反复打断；
     // core recovery 和 adapter 内部 retry 都统一按重试次数每次增加 30s。
@@ -157,7 +168,7 @@ export async function* runStreamText(input: {
       {
         ...baseStatusContext,
         maxAttempts: statusMaxAttempts(
-          Number(signatureRepairAttempted),
+          Number(signatureRepairAttempted) + modalityRepairCount,
         ),
       },
       attempt,
@@ -200,6 +211,35 @@ export async function* runStreamText(input: {
         event: "model.reasoning_signature_repair.retry",
         maxAttempts: input.retry.maxAttempts + 1,
         nextAttempt: attempt + 1,
+        requestId: statusContext.requestId,
+        status: "waiting",
+      });
+      return true;
+    };
+    const repairInputModalityRejection = (error: unknown): boolean => {
+      if (modalityRepairCount >= MAX_INPUT_MODALITY_REPAIR_ATTEMPTS) return false;
+      const rejected = rejectedInputModalityFromError(error);
+      if (rejected === undefined) return false;
+      const covered = modalitiesCoveredByRejection(rejected);
+      if (covered.every((modality) => repairedInputModalities.has(modality))) {
+        return false;
+      }
+      const projection = projectRejectedInputModality(requestMessages, rejected);
+      if (!projection) return false;
+
+      // 模态能力是声明式的，自托管 openai-compatible 端点的真实能力常与声明不符。
+      // provider 明确拒绝时，把本次请求副本里该模态的媒体块降级为文本占位重发一次；
+      // 不回写 canonical history，也不改用户声明的能力配置。
+      for (const modality of covered) repairedInputModalities.add(modality);
+      modalityRepairCount += 1;
+      requestMessages = projection.messages;
+      input.logger?.warn("Retrying model stream after input modality rejection", {
+        attempt,
+        event: "model.input_modality_repair.retry",
+        maxAttempts: input.retry.maxAttempts + modalityRepairCount,
+        nextAttempt: attempt + 1,
+        omittedMediaCount: projection.omittedMediaCount,
+        rejectedModality: rejected,
         requestId: statusContext.requestId,
         status: "waiting",
       });
@@ -367,6 +407,9 @@ export async function* runStreamText(input: {
             requestHeaderCount,
             requestHeaders,
             repairThinkingSignatureRejection,
+            repairInputModalityRejection,
+            extraRepairAttempts: () =>
+              Number(signatureRepairAttempted) + modalityRepairCount,
             retryBudgetAttempt,
             startedAt,
             statusContext,
@@ -670,10 +713,16 @@ export async function* runStreamText(input: {
       const completedAt = Date.now();
       const retryWithRepairedHistory =
         !emittedRetryBoundaryEvent && repairThinkingSignatureRejection(error);
-      if (retryWithRepairedHistory) {
+      const retryWithRepairedModality =
+        !emittedRetryBoundaryEvent &&
+        !retryWithRepairedHistory &&
+        repairInputModalityRejection(error);
+      if (retryWithRepairedHistory || retryWithRepairedModality) {
         statusContext = {
           ...statusContext,
-          maxAttempts: statusMaxAttempts(1),
+          maxAttempts: statusMaxAttempts(
+            Number(signatureRepairAttempted) + modalityRepairCount,
+          ),
         };
       }
       const classified = classifyModelFailure(error, input.request.abortSignal);
@@ -725,7 +774,7 @@ export async function* runStreamText(input: {
       if (offPeak?.kind === "queued" && !emittedRetryBoundaryEvent) {
         failureDecision.canRetry = true;
       }
-      if (retryWithRepairedHistory) {
+      if (retryWithRepairedHistory || retryWithRepairedModality) {
         failureDecision.canRetry = true;
       }
 
@@ -767,7 +816,7 @@ export async function* runStreamText(input: {
       );
       terminalStatusPublished = true;
 
-      if (retryWithRepairedHistory) {
+      if (retryWithRepairedHistory || retryWithRepairedModality) {
         await publishRetryScheduledStatus(
           input,
           statusContext,
@@ -775,7 +824,9 @@ export async function* runStreamText(input: {
           0,
           {
             ...failure,
-            retryReason: ModelRetryReason.ReasoningSignatureRepair,
+            retryReason: retryWithRepairedModality
+              ? ModelRetryReason.InputModalityRepair
+              : ModelRetryReason.ReasoningSignatureRepair,
           },
           requestHeaders,
           responseHeaders,
@@ -1005,6 +1056,9 @@ async function handleStreamChunk(input: {
   };
   pendingRetrySafeEvents: ModelStreamEvent[];
   repairThinkingSignatureRejection: (error: unknown) => boolean;
+  repairInputModalityRejection: (error: unknown) => boolean;
+  /** 修复型重试已追加的物理请求额度（signature + modality）。 */
+  extraRepairAttempts: () => number;
   retryBudgetAttempt: number;
   requestHeaderCount: number;
   requestHeaders: Record<string, string>;
@@ -1200,15 +1254,20 @@ async function handleStreamErrorEvent(
 ): Promise<Awaited<ReturnType<typeof handleStreamChunk>>> {
   const retryWithRepairedHistory =
     !input.emittedRetryBoundaryEvent && input.repairThinkingSignatureRejection(error);
-  const statusContext = retryWithRepairedHistory
-    ? {
-        ...input.statusContext,
-        maxAttempts: retryBudgetMaxAttempts(
-          input.input.request.modelRetryBudget,
-          input.input.retry.maxAttempts + 1,
-        ),
-      }
-    : input.statusContext;
+  const retryWithRepairedModality =
+    !input.emittedRetryBoundaryEvent &&
+    !retryWithRepairedHistory &&
+    input.repairInputModalityRejection(error);
+  const statusContext =
+    retryWithRepairedHistory || retryWithRepairedModality
+      ? {
+          ...input.statusContext,
+          maxAttempts: retryBudgetMaxAttempts(
+            input.input.request.modelRetryBudget,
+            input.input.retry.maxAttempts + input.extraRepairAttempts(),
+          ),
+        }
+      : input.statusContext;
   const classified = classifyModelFailure(error, input.input.request.abortSignal);
   // off-peak 特判：SSE 首块即错（尚无可见输出）时的排队 429 同样豁免预算重试。
   const offPeak = resolveOffPeakFailureDecision({
@@ -1246,7 +1305,7 @@ async function handleStreamErrorEvent(
   if (offPeak?.kind === "queued" && !input.emittedRetryBoundaryEvent) {
     failureDecision.canRetry = true;
   }
-  if (retryWithRepairedHistory) {
+  if (retryWithRepairedHistory || retryWithRepairedModality) {
     failureDecision.canRetry = true;
   }
   await publishModelStatus(
@@ -1273,7 +1332,7 @@ async function handleStreamErrorEvent(
     },
   );
 
-  if (retryWithRepairedHistory) {
+  if (retryWithRepairedHistory || retryWithRepairedModality) {
     await publishRetryScheduledStatus(
       input.input,
       statusContext,
@@ -1281,7 +1340,9 @@ async function handleStreamErrorEvent(
       0,
       {
         ...failure,
-        retryReason: ModelRetryReason.ReasoningSignatureRepair,
+        retryReason: retryWithRepairedModality
+          ? ModelRetryReason.InputModalityRepair
+          : ModelRetryReason.ReasoningSignatureRepair,
       },
       input.requestHeaders,
       responseHeaders,

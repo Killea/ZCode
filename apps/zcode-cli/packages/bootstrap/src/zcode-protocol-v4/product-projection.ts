@@ -369,6 +369,7 @@ function modelRetryReasonCode(
       return "fault.network.unreachable";
     case "auth_refresh":
     case "reasoning_signature_repair":
+    case "input_modality_repair":
       return "fault.provider.requestFailed";
   }
 }

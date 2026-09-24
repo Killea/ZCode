@@ -78,6 +78,7 @@ const THROTTLE_REASONS: ReadonlySet<string> = new Set<ConcurrencyThrottleReason>
 /** 不是 provider 失败的 retry 原因：既不减 cap 也不清 streak——只当尝试终结。 */
 const NON_FAILURE_RETRY_REASONS: ReadonlySet<string> = new Set([
   "reasoning_signature_repair",
+  "input_modality_repair",
   "auth_refresh",
 ]);
 

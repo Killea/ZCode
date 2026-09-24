@@ -9,6 +9,13 @@ import { classifyModelFailure, inspectProviderFailure } from "./failure-classifi
 import type { ClassifiedModelFailure } from "./failure-classifier.js";
 import { getResponseHeaders, unwrapRetryError } from "./failure-inspection.js";
 import { offPeakTicketExpiredMessage, resolveOffPeakFailureDecision } from "./offpeak-retry.js";
+import {
+  MAX_INPUT_MODALITY_REPAIR_ATTEMPTS,
+  modalitiesCoveredByRejection,
+  projectRejectedInputModality,
+  rejectedInputModalityFromError,
+  type RejectedInputModality,
+} from "./modality-rejection-repair.js";
 import { AiSdkModelAdapterError } from "./errors.js";
 import { resolveAnthropicRequestMetadataUserId } from "./anthropic-request-metadata.js";
 import { createGenerateTextOptions } from "./runner-options.js";
@@ -90,6 +97,10 @@ export async function runGenerateText(input: {
   const isDev = isDevelopmentModelIOEnv(input.env);
   let requestMessages = input.request.messages;
   let signatureRepairAttempted = false;
+  // 模态修复记账：provider 每明确拒绝一种输入模态，给一次不占预算的重发机会
+  // （同一 kind 不重复修；总次数封顶，见 docs/model-input-modality-repair.md）。
+  const repairedInputModalities = new Set<RejectedInputModality>();
+  let modalityRepairCount = 0;
   let emptyCompletionRetryCount = 0;
 
   for (
@@ -97,12 +108,12 @@ export async function runGenerateText(input: {
     retryAttemptLoopContinues(
       retryBudget,
       attempt,
-      input.retry.maxAttempts + Number(signatureRepairAttempted),
+      input.retry.maxAttempts + Number(signatureRepairAttempted) + modalityRepairCount,
     );
     attempt += 1
   ) {
     const retryBudgetAttempt =
-      attempt - Number(signatureRepairAttempted);
+      attempt - Number(signatureRepairAttempted) - modalityRepairCount;
     const attemptRequest = { ...input.request, messages: requestMessages };
     const startedAt = Date.now();
     let resolved = input.resolved;
@@ -110,7 +121,7 @@ export async function runGenerateText(input: {
       {
         ...baseStatusContext,
         maxAttempts: statusMaxAttempts(
-          Number(signatureRepairAttempted),
+          Number(signatureRepairAttempted) + modalityRepairCount,
         ),
       },
       attempt,
@@ -372,9 +383,35 @@ export async function runGenerateText(input: {
         // 回退 attempt 复用 requestId，也不能改写 canonical history。
         signatureRepairAttempted = true;
         requestMessages = repairedMessages;
+      }
+      // 模态能力是声明式的，自托管 openai-compatible 端点的真实能力常与声明不符。
+      // provider 明确拒绝某模态时，把本次请求副本里该模态的媒体块降级为文本占位重发一次；
+      // 不回写 canonical history，也不改用户声明的能力配置。
+      const rejectedModality =
+        !retryWithRepairedHistory &&
+        modalityRepairCount < MAX_INPUT_MODALITY_REPAIR_ATTEMPTS
+          ? rejectedInputModalityFromError(error)
+          : undefined;
+      const coveredModalities = rejectedModality
+        ? modalitiesCoveredByRejection(rejectedModality)
+        : undefined;
+      const modalityProjection =
+        rejectedModality &&
+        coveredModalities?.some((modality) => !repairedInputModalities.has(modality))
+          ? projectRejectedInputModality(requestMessages, rejectedModality)
+          : undefined;
+      const retryWithRepairedModality = modalityProjection !== undefined;
+      if (modalityProjection && coveredModalities) {
+        for (const modality of coveredModalities) repairedInputModalities.add(modality);
+        modalityRepairCount += 1;
+        requestMessages = modalityProjection.messages;
+      }
+      if (retryWithRepairedHistory || retryWithRepairedModality) {
         statusContext = {
           ...statusContext,
-          maxAttempts: statusMaxAttempts(1),
+          maxAttempts: statusMaxAttempts(
+            Number(signatureRepairAttempted) + modalityRepairCount,
+          ),
         };
       }
       const canRetryWithFailurePolicy =
@@ -387,7 +424,8 @@ export async function runGenerateText(input: {
               retryBudget,
               inspectProviderFailure(error).providerErrorCode,
             );
-      const canRetry = retryWithRepairedHistory || canRetryWithFailurePolicy;
+      const canRetry =
+        retryWithRepairedHistory || retryWithRepairedModality || canRetryWithFailurePolicy;
 
       if (options) {
         recordGenerateTextDebug({
@@ -442,15 +480,23 @@ export async function runGenerateText(input: {
         });
       }
 
-      if (retryWithRepairedHistory) {
-        input.logger?.warn("Retrying model request after thinking signature rejection", {
-          attempt,
-          event: "model.reasoning_signature_repair.retry",
-          maxAttempts: statusContext.maxAttempts,
-          nextAttempt: attempt + 1,
-          requestId: statusContext.requestId,
-          status: "waiting",
-        });
+      if (retryWithRepairedHistory || retryWithRepairedModality) {
+        input.logger?.warn(
+          retryWithRepairedModality
+            ? "Retrying model request after input modality rejection"
+            : "Retrying model request after thinking signature rejection",
+          {
+            attempt,
+            event: retryWithRepairedModality
+              ? "model.input_modality_repair.retry"
+              : "model.reasoning_signature_repair.retry",
+            maxAttempts: statusContext.maxAttempts,
+            nextAttempt: attempt + 1,
+            rejectedModality,
+            requestId: statusContext.requestId,
+            status: "waiting",
+          },
+        );
         await publishRetryScheduledStatus(
           input,
           statusContext,
@@ -458,7 +504,9 @@ export async function runGenerateText(input: {
           0,
           {
             ...failure,
-            retryReason: ModelRetryReason.ReasoningSignatureRepair,
+            retryReason: retryWithRepairedModality
+              ? ModelRetryReason.InputModalityRepair
+              : ModelRetryReason.ReasoningSignatureRepair,
           },
           requestHeaders,
           responseHeaders,
