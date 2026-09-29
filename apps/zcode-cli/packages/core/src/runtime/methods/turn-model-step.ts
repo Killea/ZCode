@@ -21,6 +21,7 @@ import {
   createCompactRapidRefillError,
   objectKeys,
   projectExecutionErrorPayload,
+  extractTextMarkupToolCalls,
   finalizeSuspiciousEmptyModelResult,
   isContextExceededFinishReason,
   isSuspiciousEmptyModelResult,
@@ -642,7 +643,7 @@ async function runModelBackedTurnStepImpl(
     toolCallCount: toolCalls.length,
   });
 
-  const executableToolCalls = toolCalls.filter((toolCall) => !toolCall.providerExecuted);
+  let executableToolCalls = toolCalls.filter((toolCall) => !toolCall.providerExecuted);
   const streamedToolResults = await streamingToolCoordinator.drain(executableToolCalls);
   if (outputTokenContinuation !== "none") {
     // 首次命中 output-limit 时，当前 request 可能带有一次性的 project-memory attachment；
@@ -706,13 +707,31 @@ async function runModelBackedTurnStepImpl(
   }
   completeOutputTokenRecovery(state.turnRequestState);
   if (executableToolCalls.length === 0) {
-    return await finishModelStepWithoutToolCalls.call(this, state, {
-      assistantPersistenceAnchor,
-      assistantCreatedAt,
-      assistantMessageId,
-      modelTraceContext,
-      result,
+    // 本地 openai-compatible 端点可能不把模型的 <tool_call> 文本标记解析成
+    // 结构化 tool_calls（如 qwen 的 hermes 格式）。此时若直接收口，模型以为
+    // 已发起调用而实际无人应答，turn 表现为"停住"。把完整标记合成 ModelToolCall
+    // 走既有执行管线：已注册名正常执行，未注册名产出 Tool not found 错误结果
+    // 回灌，模型据此自我修正继续推理。见 docs/model-text-tool-call-recovery.md。
+    const markupToolCalls = extractTextMarkupToolCalls(state.modelResponse);
+    if (markupToolCalls.length === 0) {
+      return await finishModelStepWithoutToolCalls.call(this, state, {
+        assistantPersistenceAnchor,
+        assistantCreatedAt,
+        assistantMessageId,
+        modelTraceContext,
+        result,
+      });
+    }
+    this.logger?.warn("Recovered tool calls emitted as text markup by the model", {
+      ...traceContextToLogContext(modelTraceContext),
+      event: "model.response.text_markup_tool_calls",
+      finishReason: result.finishReason,
+      module: "core.runtime",
+      status: "completed",
+      toolCallCount: markupToolCalls.length,
+      toolCallNames: markupToolCalls.map((toolCall) => toolCall.name),
     });
+    executableToolCalls = markupToolCalls;
   }
 
   state.toolCallCount += executableToolCalls.length;

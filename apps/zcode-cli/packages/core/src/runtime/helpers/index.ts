@@ -21,6 +21,7 @@ export * from "./media-attachment-path.js";
 export * from "./media-observability.js";
 export * from "./provider-request-messages.js";
 export * from "./model-tool-call-validation.js";
+export * from "./text-tool-call-recovery.js";
 export * from "./runtime-provider-request-messages.js";
 export * from "./plan-file-continuity.js";
 export * from "./turn-file-changes.js";
