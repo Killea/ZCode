@@ -25,8 +25,9 @@ test("parses function-markup tool call with parameters", () => {
   const calls = extractTextMarkupToolCalls(WEBFETCH_MARKUP);
   assert.equal(calls.length, 1);
   assert.equal(calls[0]!.name, "WebFetch");
-  assert.equal(calls[0]!.input.url, "https://example.com/docs.json");
-  assert.equal(calls[0]!.input.prompt, "List the entries of the enroll section.");
+  const input = calls[0]!.input as { url?: string; prompt?: string };
+  assert.equal(input.url, "https://example.com/docs.json");
+  assert.equal(input.prompt, "List the entries of the enroll section.");
   assert.ok(calls[0]!.id.startsWith("tool_"));
 });
 
@@ -43,8 +44,9 @@ hi
 </tool_call>`;
   const calls = extractTextMarkupToolCalls(markup);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0]!.input.url, "https://example.com");
-  assert.equal(calls[0]!.input.prompt, "hi");
+  const input = calls[0]!.input as { url?: string; prompt?: string };
+  assert.equal(input.url, "https://example.com");
+  assert.equal(input.prompt, "hi");
 });
 
 test("parses hermes JSON-variant tool call", () => {
