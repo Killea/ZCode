@@ -90,6 +90,28 @@ export function observeToolAdmissionClock(
   else if (payload.type === "model_request_admitted") deadline.resume();
 }
 
+/**
+ * 提取父级 abort 的可读原因文本。AbortController.abort(reason) 会把原因放进 signal.reason
+ * （如 runtime 停机的 "Protocol runtime stopping"）；之前这里丢弃原因只剩
+ * "was cancelled" 泛化文案，用户分不清"手动停止"与"host 断开/运行时关闭"（见
+ * docs/tool-cancel-abort-reason.md）。无语义的裸 abort（AbortError DOMException）不附加。
+ */
+function abortReasonDetail(signal: AbortSignal): string | undefined {
+  const reason = signal.reason as unknown;
+  if (reason instanceof Error && reason.message.trim().length > 0) {
+    if (reason.name === "AbortError") return undefined;
+    return reason.message.trim();
+  }
+  if (typeof reason === "string" && reason.trim().length > 0) return reason.trim();
+  return undefined;
+}
+
+function cancelledToolMessage(entry: ToolEntry, signal: AbortSignal): string {
+  const base = entry.cancellation?.userVisibleMessage ?? "Tool execution cancelled";
+  const detail = abortReasonDetail(signal);
+  return detail ? `${base} — ${detail}` : base;
+}
+
 export async function executeWithTimeout<TInput, TOutput>(
   handler: (input: TInput, context: ToolExecutionContext) => Promise<TOutput>,
   input: TInput,
@@ -103,7 +125,7 @@ export async function executeWithTimeout<TInput, TOutput>(
       reject(
         createCoreError(
           CoreErrorType.ToolCancelled,
-          entry.cancellation?.userVisibleMessage ?? "Tool execution cancelled",
+          cancelledToolMessage(entry, context.abortSignal),
         ),
       );
       return;
@@ -154,7 +176,7 @@ export async function executeWithTimeout<TInput, TOutput>(
       rejectOnce(
         createCoreError(
           CoreErrorType.ToolCancelled,
-          entry.cancellation?.userVisibleMessage ?? "Tool execution cancelled",
+          cancelledToolMessage(entry, context.abortSignal),
           {
             context: {
               cancellation: entry.cancellation?.cleanup ?? "none",
