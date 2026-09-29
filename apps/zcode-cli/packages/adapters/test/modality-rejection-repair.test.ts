@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ModelInputMessage, ModelMessageContentBlock } from "@zcode/contracts";
+import { createModelId, createModelProviderId } from "@zcode/contracts";
 import {
   MAX_INPUT_MODALITY_REPAIR_ATTEMPTS,
   modalitiesCoveredByRejection,
@@ -108,8 +109,12 @@ test("projection replaces rejected modality blocks with text placeholders only",
     content.map((block) => block.type),
     ["text", "text", "text", "image"],
   );
-  assert.match(content[1]?.text ?? "", /Media omitted/);
-  assert.match(content[1]?.text ?? "", /receipt\.pdf/);
+  const textOf = (index: number): string => {
+    const block = content[index];
+    return block && "text" in block ? String(block.text) : "";
+  };
+  assert.match(textOf(1), /Media omitted/);
+  assert.match(textOf(1), /receipt\.pdf/);
   // 原消息不被改写（canonical history 不可变）。
   assert.equal((messages[0]?.content as unknown[])[1], PDF_BLOCK);
 });
@@ -121,11 +126,26 @@ test("projection returns undefined when no matching media exists", () => {
 
 function fakeResolved(): ResolvedAiSdkModel {
   return {
-    providerId: "local",
-    modelId: "test-model",
+    providerId: createModelProviderId("local"),
+    modelId: createModelId("test-model"),
     providerKind: "openai-compatible",
     // 声明支持 PDF（错误声明），投影保留 file 块 → provider 才拒绝。
-    properties: { inputFormat: { supportsPdf: true } },
+    properties: {
+      requiresMfjsToolSchema: false,
+      contextWindow: 128_000,
+      inputFormat: {
+        supportsText: true,
+        supportsImage: true,
+        supportsVideo: true,
+        supportsAudio: true,
+        supportsPdf: true,
+      },
+      outputFormat: { supportsText: true },
+      supportsToolCall: true,
+      supportsJsonSchemaOutput: false,
+      supportsNativeWebSearch: false,
+      supportsMidConversationSystem: true,
+    },
     model: {} as ResolvedAiSdkModel["model"],
   };
 }
