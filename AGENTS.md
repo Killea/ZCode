@@ -80,3 +80,26 @@
 - `info` 用于进程和会话生命周期、权限结果、一次性初始化等生产可用事件。
 - `warn` 用于可恢复异常；`error` 用于崩溃、握手失败、鉴权丢失等不可恢复错误。
 - 不在日志、示例或提交中写入凭据、真实用户数据和内部服务地址。
+
+## 本机构建与运行（桌面版）
+
+- 桌面快捷方式 `~/Desktop/ZCode Preview.desktop` 直接指向解包二进制：
+  `packages/desktop/dist/linux-unpacked/zcode-preview --no-sandbox`，不走 AppImage。
+- `linux-unpacked/resources/glm/zcode.cjs` 是指向
+  `apps/zcode-cli/packages/cli/dist/zcode.cjs` 的符号链接。
+  因此 CLI/runtime 改动只需 `pnpm --dir apps/zcode-cli build` 后重启 App，无需重新打包或安装。
+- 若重打 AppImage（`pnpm --dir packages/desktop build`），electron-builder 会重建
+  `linux-unpacked` 并把符号链接覆盖为真实文件——需重跑：
+  `ln -sf "$PWD/apps/zcode-cli/packages/cli/dist/zcode.cjs" packages/desktop/dist/linux-unpacked/resources/glm/zcode.cjs`
+- `packages/desktop/bundled-agents/<platform>/glm/zcode.cjs` 必须是真实文件，不要改成符号链接：
+  `stage-agent-bundle.mjs` / `prepare:runtime-assets` 会用 `fs.copyFileSync` 写入该路径，
+  指向同一源文件会触发 ERR_FS_CP_EINVAL。
+- 打包态 agent 解析顺序（`desktopRuntimeEnv.ts`）：`process.resourcesPath/glm/zcode.cjs` 优先；
+  dev 态候选 `bundled-agents/<platform>/glm/`。环境变量显式路径仅作兜底。
+- `~/Desktop/ZCode.desktop` 走 `~/.local/bin/zcode-launcher.sh` → `~/Applications` 下最新
+  `ZCode-*.AppImage` 正式版，与仓库构建无关，勿混用。
+- `pnpm build:zcode`（发行 tarball）需要 `ZCODE_DIST_BASE_URL`，本地未配置时不适用；
+  日常验证用 `pnpm --dir apps/zcode-cli build` 的产物即可。
+- 验证基线（2026-09）：`pnpm --dir apps/zcode-cli lint` 存在存量失败
+  （adapters 包约 18w/25e、`turn-model-step.ts` 超 max-lines 等）；判断回归需与改动前
+  baseline 对比，不要把存量失败当作新引入。根级 `pnpm typecheck` / `pnpm lint` 是干净的。
