@@ -1,5 +1,5 @@
 import type { BrowserWindow, MessageBoxReturnValue } from "electron";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { arch, hostname, platform, release, type, version as osVersion } from "node:os";
 import { join } from "node:path";
 import {
@@ -23,6 +23,7 @@ interface AboutSnapshot {
   appVersion: string;
   buildCommitId: string;
   buildTime: string;
+  lastModifiedAt: string;
   environment: string;
   electronVersion: string;
   electronBuilderVersion: string;
@@ -40,6 +41,7 @@ interface AboutSnapshot {
 interface AboutSnapshotOptions {
   appVersion?: string;
   buildMetadata?: DesktopBuildMetadata | null;
+  agentBundlePath?: string;
   environment?: string;
   runtimeVersions?: Pick<NodeJS.ProcessVersions, "electron" | "chrome" | "node" | "v8">;
   osInfo?: {
@@ -62,6 +64,7 @@ const ABOUT_MESSAGES: Record<
   {
     aboutTitle: string;
     versionLabel: string;
+    modifiedLabel: string;
     okButtonLabel: string;
     optimizedForAppleSilicon: string;
     copyright: (year: number) => string;
@@ -70,6 +73,7 @@ const ABOUT_MESSAGES: Record<
   "zh-CN": {
     aboutTitle: "关于 ZCode",
     versionLabel: "版本",
+    modifiedLabel: "最后修改",
     okButtonLabel: "确定",
     optimizedForAppleSilicon: "已针对 Apple Silicon 优化。",
     copyright: (year) => `版权所有 © ${year} ZCode。`,
@@ -77,6 +81,7 @@ const ABOUT_MESSAGES: Record<
   "en-US": {
     aboutTitle: "About ZCode",
     versionLabel: "version",
+    modifiedLabel: "Last modified",
     okButtonLabel: "OK",
     optimizedForAppleSilicon: "Optimized for Apple Silicon.",
     copyright: (year) => `Copyright © ${year} ZCode.`,
@@ -126,6 +131,34 @@ export function readBuildMetadata(
   return readJsonFile<DesktopBuildMetadata>(filePath);
 }
 
+function formatLocalTimestamp(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function resolveLastModifiedAt(
+  buildTime: string | undefined,
+  agentBundlePath: string | undefined,
+): string {
+  // “最后修改”取打包元数据 buildTime 与实际运行 agent bundle mtime 的较新值：
+  // 本机构建下 resources/glm/zcode.cjs 是指向 CLI dist 的符号链接，
+  // pnpm --dir apps/zcode-cli build 后 mtime 刷新，而 build-meta.json 只在桌面打包时更新；
+  // 只看 buildTime 会让日常重编译在 About 里不可见。
+  let latest = Date.parse(buildTime ?? "");
+  if (agentBundlePath) {
+    try {
+      const bundleMtime = statSync(agentBundlePath).mtimeMs;
+      if (!Number.isFinite(latest) || bundleMtime > latest) {
+        latest = bundleMtime;
+      }
+    } catch {
+      // bundle 缺失或不可读时仅按 buildTime 展示。
+    }
+  }
+  return Number.isFinite(latest) ? formatLocalTimestamp(latest) : "unknown";
+}
+
 function resolveElectronBuilderVersion(buildMetadata: DesktopBuildMetadata | null): string {
   if (buildMetadata?.electronBuilderVersion) {
     return normalizeValue(buildMetadata.electronBuilderVersion);
@@ -153,6 +186,10 @@ export function createAboutSnapshot(options: AboutSnapshotOptions = {}): AboutSn
     appVersion: normalizeValue(options.appVersion ?? buildMetadata?.appVersion ?? ZCODE_VERSION),
     buildCommitId: normalizeValue(buildMetadata?.buildCommitId ?? ZCODE_COMMIT),
     buildTime: normalizeValue(buildMetadata?.buildTime ?? ZCODE_BUILD_TIME),
+    lastModifiedAt: resolveLastModifiedAt(
+      buildMetadata?.buildTime ?? ZCODE_BUILD_TIME,
+      options.agentBundlePath,
+    ),
     environment: normalizeValue(options.environment ?? ZCODE_ENV),
     electronVersion: normalizeValue(runtimeVersions.electron),
     electronBuilderVersion: resolveElectronBuilderVersion(buildMetadata),
@@ -173,6 +210,7 @@ export function formatAboutDetail(snapshot: AboutSnapshot): string {
     `Version: ${snapshot.appVersion}`,
     `Commit: ${snapshot.buildCommitId}`,
     `Build Time: ${snapshot.buildTime}`,
+    `Last Modified: ${snapshot.lastModifiedAt}`,
     `Environment: ${snapshot.environment}`,
     "",
     `Electron: ${snapshot.electronVersion}`,
@@ -219,9 +257,12 @@ export async function showAboutDialog(
   locale: Locale = DEFAULT_LOCALE,
 ): Promise<MessageBoxReturnValue> {
   const { app, BrowserWindow } = await import("electron");
+  // 懒加载 runtime env：顶层静态导入会把 electron 依赖链拉进纯计算测试的模块图。
+  const { resolveBundledGlmBinaryPath } = await import("./desktopRuntimeEnv.js");
   const snapshot = createAboutSnapshot({
     appVersion: app.getVersion(),
     buildMetadata: readBuildMetadata(),
+    agentBundlePath: resolveBundledGlmBinaryPath(),
   });
   const aboutMessages = getAboutMessages(locale);
   // 之前只有 macOS 使用自绘 About，Windows/Linux 仍走原生 message box。
@@ -260,6 +301,10 @@ export async function showAboutDialog(
         copyright: formatAboutCopyright(undefined, locale),
         optimizationLine: formatAboutOptimizationLine(snapshot, locale),
         versionLabel: aboutMessages.versionLabel,
+        modifiedLine:
+          snapshot.lastModifiedAt === "unknown"
+            ? ""
+            : `${aboutMessages.modifiedLabel} ${snapshot.lastModifiedAt}`,
         okButtonLabel: aboutMessages.okButtonLabel,
       }),
     )}`,

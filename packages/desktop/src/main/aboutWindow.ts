@@ -3,6 +3,7 @@ interface CustomAboutDialogHtmlInput {
   appVersion: string;
   copyright: string;
   optimizationLine: string;
+  modifiedLine?: string;
   versionLabel: string;
   okButtonLabel: string;
 }
@@ -197,6 +198,7 @@ export function createCustomAboutDialogHtml(input: CustomAboutDialogHtmlInput): 
           </h1>
           <div class="meta">
             ${input.optimizationLine ? `<div>${escapeHtml(input.optimizationLine)}</div>` : ""}
+            ${input.modifiedLine ? `<div>${escapeHtml(input.modifiedLine)}</div>` : ""}
             <div>${escapeHtml(input.copyright)}</div>
           </div>
         </div>
