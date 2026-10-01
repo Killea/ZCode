@@ -17,6 +17,10 @@ import {
 import { cleanupPackagedSourcemaps } from "./scripts/packaged-sourcemap-cleanup.mjs";
 import { getTargetPlatform } from "./scripts/target-platform.mjs";
 import {
+  macosLocalNetworkUsageDescription,
+  patchMacBundleLocalNetworkUsage,
+} from "./scripts/macos-local-network-usage.mjs";
+import {
   resolveDesktopArtifactSuffix,
   resolveDesktopProductIdentity,
 } from "./scripts/desktop-product-identity.mjs";
@@ -559,6 +563,17 @@ export default {
     runTimedSync("afterPack:assertPackagedNodePtyPrebuild", () =>
       assertPackagedNodePtyPrebuild(context),
     );
+    if (context.electronPlatformName === "darwin") {
+      // Local Network 归因落在发起连接的 Helper 进程身份上（如
+      // com.github.Electron Helper）；extendInfo 只覆盖主 app plist，这里把
+      // Frameworks 下全部 Helper 子包的 Info.plist 也补上声明，且必须在签名前完成。
+      await runTimedAsync("afterPack:declareMacLocalNetworkUsage", () =>
+        patchMacBundleLocalNetworkUsage({
+          appPath: resolve(context.appOutDir, context.packager.info.framework.distMacOsAppName),
+          description: macosLocalNetworkUsageDescription(desktopProductIdentity.productName),
+        }),
+      );
+    }
     if (actualWindowsTarget) {
       await runTimedAsync("afterPack:writeWindowsInstallManifest", () =>
         writeWindowsInstallManifest(context),
@@ -660,6 +675,13 @@ export default {
     artifactName: buildDesktopArtifactName("mac"),
     extendInfo: {
       NSAppleEventsUsageDescription: `${desktopProductIdentity.productName} needs Apple Events access to coordinate local automation workflows with user-approved desktop apps.`,
+      // Bugfix: macOS 的 Local Network 隐私策略（NECP）会拦截未授权应用的私网连接，
+      // 对 LAN 上的 OpenAI 兼容推理服务表现为 connect EHOSTUNREACH。没有
+      // NSLocalNetworkUsageDescription 时系统无法弹授权框，LAN 模型服务永远连不上。
+      // 归因按发起连接的进程身份判定，Helper 子 bundle 的声明在 afterPack 兜底补齐。
+      NSLocalNetworkUsageDescription: macosLocalNetworkUsageDescription(
+        desktopProductIdentity.productName,
+      ),
     },
     // 预签名脚本走的是原生 codesign，要求完整的 "Developer ID Application: ..." 身份串；
     // 但 electron-builder 的 mac.identity 在 26.x 下会拒绝带此前缀的名字。
