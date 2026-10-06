@@ -142,7 +142,10 @@ import {
   showCurrentWindowFromDock,
   syncApplicationUnreadBadge,
 } from "./desktopWindowLifecycle.js";
-import { handleDesktopWindowCloseRequest } from "./desktopWindowCloseRequest.js";
+import {
+  handleDesktopWindowCloseRequest,
+  resolveShouldConfirmAppQuit,
+} from "./desktopWindowCloseRequest.js";
 import { resolveZCodeBuiltinProviderConfigFilePath } from "./desktopProviderConfig.js";
 import {
   getCredentialsDir,
@@ -1304,13 +1307,18 @@ async function prepareWindowsProcessesForUpdateInstall() {
 }
 
 function shouldConfirmAppQuit() {
-  // 开发环境里的普通会话经常需要重启 Electron，只在 production 下拦截，避免打断调试。
-  return ZCODE_ENV === "production" && getRunningAgentSessionCount() > 0;
+  return resolveShouldConfirmAppQuit({
+    isPackaged: app.isPackaged,
+    e2eRunId: process.env.ZCODE_E2E_RUN_ID,
+    runningSessionCount: getRunningAgentSessionCount(),
+  });
 }
 
 function confirmAppQuit(originWindow?: BrowserWindow | null) {
   if (!shouldConfirmAppQuit()) {
-    logger.info(`[app-quit] quit confirmation skipped in ${ZCODE_ENV}`);
+    logger.info(
+      `[app-quit] quit confirmation skipped packaged=${app.isPackaged} running=${getRunningAgentSessionCount()}`,
+    );
     return true;
   }
 

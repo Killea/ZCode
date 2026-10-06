@@ -9,6 +9,9 @@
 - 存在至少 1 个活跃会话 → `dialog.showMessageBoxSync` 确认框(退出/取消),文案列出活跃会话数。
 - 无活跃会话 → 直接退出,不弹框。
 - `forceQuit`(更新安装、调试强制退出、已确认过的退出重入)与 Windows close-to-tray、非最后窗口关闭均不弹框。
+- 拦截门控以安装形态为准:所有打包产物(含连 test 后端的 Preview/本地 linux-unpacked)
+  都启用确认;未打包的 `pnpm dev:desktop` 与 E2E(`ZCODE_E2E_RUN_ID`)运行不拦截,
+  避免打断调试与自动化退出清理。
 - macOS 窗口关闭按钮走 `handleDarwinWindowCloseRequest`(隐藏而非退出),不在本规则内。
 
 ## 活跃会话定义
@@ -49,7 +52,7 @@ CLI runtime ──sessions-index topic──> zcodeTaskIndexSyncer (services)
         ▼ parentPort
    main (desktopHostProcess) → hostRunningTaskCountMap
    getRunningAgentSessionCount() = Σ map values
-   shouldConfirmAppQuit() = production && count > 0
+   shouldConfirmAppQuit() = app.isPackaged && !e2eRun && count > 0
 ```
 
 - 本地 runtime 的会话(含 subagent session、自动化/off-peak 任务 session)经 syncer 计数;

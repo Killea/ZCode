@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { handleDesktopWindowCloseRequest } from "../src/main/desktopWindowCloseRequest.js";
+import {
+  handleDesktopWindowCloseRequest,
+  resolveShouldConfirmAppQuit,
+} from "../src/main/desktopWindowCloseRequest.js";
 
 const noopLogger = { info: () => {} };
 
@@ -109,4 +112,38 @@ test("Windows close-to-tray + 显式退出请求 → 不走托盘", () => {
   assert.equal(handled, true);
   assert.equal(calls.hideWindow, 0);
   assert.equal(calls.requestQuit, 0);
+});
+
+test("确认门控：打包 + 有活跃会话 → 确认", () => {
+  assert.equal(resolveShouldConfirmAppQuit({ isPackaged: true, runningSessionCount: 1 }), true);
+});
+
+test("确认门控：打包 + 无活跃会话 → 直接退出", () => {
+  assert.equal(resolveShouldConfirmAppQuit({ isPackaged: true, runningSessionCount: 0 }), false);
+});
+
+test("确认门控：test 后端的打包 Preview 也拦截", () => {
+  // isPackaged 与后端环境无关：连 test 后端的安装包同样保护运行中会话。
+  assert.equal(
+    resolveShouldConfirmAppQuit({
+      isPackaged: true,
+      runningSessionCount: 2,
+    }),
+    true,
+  );
+});
+
+test("确认门控：未打包 dev 运行不拦截", () => {
+  assert.equal(resolveShouldConfirmAppQuit({ isPackaged: false, runningSessionCount: 3 }), false);
+});
+
+test("确认门控：E2E 运行不拦截", () => {
+  assert.equal(
+    resolveShouldConfirmAppQuit({
+      isPackaged: true,
+      e2eRunId: "e2e-run-1",
+      runningSessionCount: 3,
+    }),
+    false,
+  );
 });
