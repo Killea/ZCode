@@ -107,7 +107,9 @@ for (const clientMode of ["desktop-continuous", "web-remote-replayable"] as cons
         onSessionReadyEvent: disposable,
         disposeAll() {},
       } as unknown as Options["taskIndexSyncer"],
-    });
+      // disposeAll 是 host 生命周期钩子，不在 IZCodeTaskService 接口上声明；
+      // node.ts 用结构探测调用，测试里同样按结构类型断言。
+    }) as ReturnType<typeof createZCodeTaskServiceAdapter> & { disposeAll(): void };
     try {
       const snapshot = await service.getTaskSnapshot({ ...meta, clientMode });
       assert.equal(snapshot?.meta.taskId, meta.taskId);

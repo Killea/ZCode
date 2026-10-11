@@ -12,7 +12,9 @@ import {
   ArrowLeft,
   Copy,
   Ellipsis,
+  FilePlus,
   FolderOpen,
+  FolderPlus,
   GitCommitVertical,
   RefreshCw,
   Search,
@@ -20,6 +22,16 @@ import {
 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/components/lib/utils.js";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.js";
 import { Button } from "@/components/ui/button.js";
 import { Input } from "@/components/ui/input.js";
 import {
@@ -48,7 +60,7 @@ import {
   type WorkspaceFileGitStatus,
   type WorkspaceFileTreeRow,
 } from "@/workspace-file-tree/model.js";
-import { getPathLeaf } from "@/lib/path.js";
+import { getContainingDirectoryPath, getPathLeaf } from "@/lib/path.js";
 import { logger } from "@/logger.js";
 import { WORKSPACE_FILE_TREE_VIRTUAL_ROW_HEIGHT_PX } from "@/workspace-file-tree/constants.js";
 import { getFileManagerLabel } from "@/workspace-file-tree/helpers.js";
@@ -58,6 +70,7 @@ import {
   resolveWorkspaceEditorSelection,
   resolveWorkspaceFileManagerEditor,
 } from "@/lib/workspaceEditorSelection.js";
+import { useWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
 import { useWorkspaceFileTreeData } from "@/workspace-file-tree/useWorkspaceFileTreeData.js";
 import { useWorkspaceFileTreeStickyFolders } from "@/workspace-file-tree/useWorkspaceFileTreeStickyFolders.js";
 import {
@@ -74,9 +87,16 @@ import {
   getWorkspaceFileSearchDirectoryRevealPaths,
 } from "@/workspace-file-tree/searchRows.js";
 import type {
+  WorkspaceFileTreeEditingSession,
+  WorkspaceFileTreeFileOps,
   WorkspaceFileTreeProps,
   WorkspaceFileTreeStickyFolderItem,
 } from "@/workspace-file-tree/types.js";
+import {
+  createWorkspaceFileTreeEditingSession,
+  createWorkspaceFileTreeRenameSession,
+  injectWorkspaceFileTreeDraftRow,
+} from "@/workspace-file-tree/workspaceFileEdit.js";
 
 function getWorkspaceFileTreeDirectoryLoadDepth(
   workspacePath: string,
@@ -124,6 +144,20 @@ export function WorkspaceFileTree({
     workspaceRemoteSessionId,
     enableWorkspaceFeatures: !temporaryExternalDirectory,
   });
+  // 文件写操作与树数据走同一个 workspace 路由（本地/远程由 remoteSessionId 决定）。
+  const { fileService } = useWorkspaceServices(
+    workspacePath,
+    workspaceRemoteSessionId,
+    workspaceIdentity,
+  );
+  const [editingSession, setEditingSession] = useState<WorkspaceFileTreeEditingSession | null>(
+    null,
+  );
+  const [pendingDelete, setPendingDelete] = useState<{
+    path: string;
+    name: string;
+    kind: "file" | "directory";
+  } | null>(null);
   const { installedEditors } = useInstalledFileTreeEditors();
   const isRemoteWorkspaceFileTree = Boolean(workspaceRemoteSessionId || workspaceIdentity);
   const { remoteTarget } = useWorkspaceOpenInEditorTarget({
@@ -169,24 +203,34 @@ export function WorkspaceFileTree({
     [searchEntries],
   );
   const visibleRows = useMemo(() => {
-    if (hasFileSearchQuery) {
-      return showChangedOnly
+    const baseRows = hasFileSearchQuery
+      ? showChangedOnly
         ? searchRows.filter((row) => getWorkspaceFileGitStatus(treeData.gitStatusByPath, row.path))
-        : searchRows;
+        : searchRows
+      : filterWorkspaceFileTreeRows({
+          rows: treeData.rows,
+          searchQuery: fileSearchQuery,
+          changedOnly: showChangedOnly,
+          statusByPath: treeData.gitStatusByPath,
+        });
+    // 搜索/过滤态下不注入草稿行：编辑入口此时已禁用，会话不会存活到过滤态。
+    if (!editingSession || hasFileSearchQuery) {
+      return baseRows;
     }
-    return filterWorkspaceFileTreeRows({
-      rows: treeData.rows,
-      searchQuery: fileSearchQuery,
-      changedOnly: showChangedOnly,
-      statusByPath: treeData.gitStatusByPath,
+    return injectWorkspaceFileTreeDraftRow({
+      rows: baseRows,
+      session: editingSession,
+      workspacePath,
     });
   }, [
+    editingSession,
     fileSearchQuery,
     hasFileSearchQuery,
     searchRows,
     showChangedOnly,
     treeData.gitStatusByPath,
     treeData.rows,
+    workspacePath,
   ]);
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
@@ -199,6 +243,9 @@ export function WorkspaceFileTree({
     setSelectedPath(null);
     setFileSearchQuery("");
     setShowChangedOnly(false);
+    // 行内编辑与删除确认绑定具体路径，workspace 切换后必须一并作废。
+    setEditingSession(null);
+    setPendingDelete(null);
   }, [workspaceIdentity, workspacePath]);
 
   useEffect(() => {
@@ -252,12 +299,16 @@ export function WorkspaceFileTree({
       copyRelativePath: intl.formatMessage({
         id: "fileActions.copyRelativePath",
       }),
+      delete: intl.formatMessage({ id: "workspaceFileTree.delete" }),
+      newFile: intl.formatMessage({ id: "workspaceFileTree.newFile" }),
+      newFolder: intl.formatMessage({ id: "workspaceFileTree.newFolder" }),
       open: intl.formatMessage({ id: "common.open" }),
       openInBrowser: intl.formatMessage({
         id: "workspaceFileTree.openInBrowser",
       }),
       openFailed: intl.formatMessage({ id: "workspaceFileTree.openFailed" }),
       openWith: intl.formatMessage({ id: "workspaceFileTree.openWith" }),
+      rename: intl.formatMessage({ id: "workspaceFileTree.rename" }),
       reveal: fileManagerLabel,
     }),
     [fileManagerLabel, intl],
@@ -555,8 +606,163 @@ export function WorkspaceFileTree({
     },
     [handleDirectoryAction, onOpenPreview, treeData.gitStatusByPath],
   );
+  const editingDisabled = hasFileSearchQuery;
+  const editingInvalidMessage = intl.formatMessage({
+    id: "workspaceFileTree.editingInvalidName",
+  });
+  const handleStartEditing = useCallback(
+    (session: WorkspaceFileTreeEditingSession) => {
+      // create 落在折叠目录上时先展开父目录，草稿行才能注入到正确的可见位置。
+      if (
+        session.mode !== "rename" &&
+        session.parentPath &&
+        !areWorkspaceFilePathsEqual(session.parentPath, workspacePath)
+      ) {
+        const parentPath = session.parentPath;
+        treeData.setExpandedPaths((current) => {
+          const next = new Set(current);
+          next.add(parentPath);
+          return next;
+        });
+        void treeData.loadDirectory(
+          parentPath,
+          getWorkspaceFileTreeDirectoryLoadDepth(workspacePath, parentPath),
+        );
+      }
+      setEditingSession(session);
+    },
+    [treeData, workspacePath],
+  );
+  const handleCancelEditing = useCallback((session: WorkspaceFileTreeEditingSession) => {
+    // 会话可能已被新的编辑动作替换；只清理仍属于该输入框的会话。
+    setEditingSession((current) => (current === session ? null : current));
+  }, []);
+  const handleEditingInvalid = useCallback((message: string) => {
+    toast(message);
+  }, []);
+  const handleCommitEditing = useCallback(
+    async (session: WorkspaceFileTreeEditingSession, name: string) => {
+      // commit 以输入框持有的 session 为准：编辑期间会话可能已被替换，
+      // 从 state 读取会把旧输入的值提交到新会话上。
+      const parentPath =
+        session.mode === "rename"
+          ? getContainingDirectoryPath(session.targetPath ?? "")
+          : session.parentPath;
+      try {
+        const result =
+          session.mode === "rename"
+            ? await fileService.renameWorkspaceEntry({
+                rootPath: workspacePath,
+                path: session.targetPath ?? "",
+                newName: name,
+              })
+            : await fileService.createWorkspaceEntry({
+                rootPath: workspacePath,
+                parentPath: session.parentPath ?? workspacePath,
+                name,
+                kind: session.kind,
+              });
+        setEditingSession((current) => (current === session ? null : current));
+        setSelectedPath(result.path);
+        if (parentPath) {
+          // 主动重载父目录，不依赖 watcher 时序；watcher 通知作为兜底。
+          void treeData.loadDirectory(
+            parentPath,
+            getWorkspaceFileTreeDirectoryLoadDepth(workspacePath, parentPath),
+            { force: true },
+          );
+        }
+      } catch (error) {
+        logger.warn("[WorkspaceFileTree] 文件写操作失败", {
+          mode: session.mode,
+          parentPath,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        toast(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [fileService, treeData, workspacePath],
+  );
+  const handleRequestDelete = useCallback((row: WorkspaceFileTreeRow) => {
+    setPendingDelete({
+      path: row.path,
+      name: row.name,
+      kind: row.type === "directory" ? "directory" : "file",
+    });
+  }, []);
+  const handleConfirmDelete = useCallback(async () => {
+    const target = pendingDelete;
+    if (!target) {
+      return;
+    }
+    try {
+      await fileService.deleteWorkspaceEntry({ rootPath: workspacePath, path: target.path });
+      // 被删条目是选中项或其祖先目录时，同步清掉失效的选中态。
+      setSelectedPath((current) =>
+        current &&
+        (areWorkspaceFilePathsEqual(current, target.path) ||
+          isWorkspaceFilePathInside(target.path, current))
+          ? null
+          : current,
+      );
+      const parentPath = getContainingDirectoryPath(target.path);
+      if (parentPath) {
+        void treeData.loadDirectory(
+          parentPath,
+          getWorkspaceFileTreeDirectoryLoadDepth(workspacePath, parentPath),
+          { force: true },
+        );
+      }
+    } catch (error) {
+      logger.warn("[WorkspaceFileTree] 删除文件失败", {
+        path: target.path,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      toast(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPendingDelete(null);
+    }
+  }, [fileService, pendingDelete, treeData, workspacePath]);
+  const fileOps = useMemo<WorkspaceFileTreeFileOps>(
+    () => ({
+      editingSession,
+      editingDisabled,
+      editingInvalidMessage,
+      onStartEditing: handleStartEditing,
+      onRequestDelete: handleRequestDelete,
+      onCommitEditing: handleCommitEditing,
+      onCancelEditing: handleCancelEditing,
+      onEditingInvalid: handleEditingInvalid,
+    }),
+    [
+      editingSession,
+      editingDisabled,
+      editingInvalidMessage,
+      handleStartEditing,
+      handleRequestDelete,
+      handleCommitEditing,
+      handleCancelEditing,
+      handleEditingInvalid,
+    ],
+  );
+
   const handleRowKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>, row: WorkspaceFileTreeRow) => {
+      // deleted 虚拟行不对应磁盘真实条目，不能参与重命名/删除。
+      const isDeletedRow = isWorkspaceFileTreeDeletedFile(
+        row,
+        getWorkspaceFileGitStatus(treeData.gitStatusByPath, row.path),
+      );
+      if (event.key === "F2" && !editingDisabled && !isDeletedRow) {
+        event.preventDefault();
+        handleStartEditing(createWorkspaceFileTreeRenameSession(row));
+        return;
+      }
+      if (event.key === "Delete" && !editingDisabled && !isDeletedRow) {
+        event.preventDefault();
+        handleRequestDelete(row);
+        return;
+      }
       if (event.key === "Enter") {
         event.preventDefault();
         handleOpenPreview(row);
@@ -574,7 +780,16 @@ export function WorkspaceFileTree({
         handleToggleDirectory(row);
       }
     },
-    [handleDirectoryAction, handleOpenPreview, handleToggleDirectory, hasFileSearchQuery],
+    [
+      editingDisabled,
+      handleDirectoryAction,
+      handleOpenPreview,
+      handleRequestDelete,
+      handleStartEditing,
+      handleToggleDirectory,
+      hasFileSearchQuery,
+      treeData.gitStatusByPath,
+    ],
   );
 
   const hasActiveFileTreeFilter = fileSearchQuery.trim().length > 0 || showChangedOnly;
@@ -608,21 +823,23 @@ export function WorkspaceFileTree({
       className="flex h-full min-h-0 flex-col text-foreground"
       data-testid={TID_WORKSPACE_FILE_TREE_PANEL}
     >
-      <div className="px-2 pb-3 pt-3">
-        <Button
-          type="button"
-          variant="ghost"
-          size="lg"
-          className="w-full justify-start gap-2 rounded-xl px-2.5 text-foreground-subtle hover:bg-surface-hover hover:text-foreground"
-          onClick={onClose}
-        >
-          <ArrowLeft className="size-4 shrink-0" />
-          <span className="min-w-0 truncate">
-            {intl.formatMessage({ id: "workspaceFileTree.backToTasks" })}
-          </span>
-        </Button>
-      </div>
-      <div className="flex shrink-0 items-center px-2 pb-2">
+      {onClose ? (
+        <div className="px-2 pb-3 pt-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="lg"
+            className="w-full justify-start gap-2 rounded-xl px-2.5 text-foreground-subtle hover:bg-surface-hover hover:text-foreground"
+            onClick={onClose}
+          >
+            <ArrowLeft className="size-4 shrink-0" />
+            <span className="min-w-0 truncate">
+              {intl.formatMessage({ id: "workspaceFileTree.backToTasks" })}
+            </span>
+          </Button>
+        </div>
+      ) : null}
+      <div className={cn("flex shrink-0 items-center px-2 pb-2", !onClose && "pt-3")}>
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtlest" />
           <Input
@@ -663,6 +880,46 @@ export function WorkspaceFileTree({
             {workspaceTitle}
           </h3>
         </div>
+        <ControlHintTooltip title={fileContextMenuLabels.newFile}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={fileContextMenuLabels.newFile}
+            className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground"
+            disabled={editingDisabled}
+            onClick={() =>
+              handleStartEditing(
+                createWorkspaceFileTreeEditingSession({
+                  mode: "create-file",
+                  parentPath: workspacePath,
+                }),
+              )
+            }
+          >
+            <FilePlus className="size-3.5" />
+          </Button>
+        </ControlHintTooltip>
+        <ControlHintTooltip title={fileContextMenuLabels.newFolder}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={fileContextMenuLabels.newFolder}
+            className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground"
+            disabled={editingDisabled}
+            onClick={() =>
+              handleStartEditing(
+                createWorkspaceFileTreeEditingSession({
+                  mode: "create-directory",
+                  parentPath: workspacePath,
+                }),
+              )
+            }
+          >
+            <FolderPlus className="size-3.5" />
+          </Button>
+        </ControlHintTooltip>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -747,6 +1004,7 @@ export function WorkspaceFileTree({
             gitStatusLabelByStatus={gitStatusLabelByStatus}
             contextMenuLabels={fileContextMenuLabels}
             editorState={editorState}
+            fileOps={fileOps}
             workspacePath={workspacePath}
             workspaceIdentity={workspaceIdentity}
             onSelect={setSelectedPath}
@@ -780,6 +1038,7 @@ export function WorkspaceFileTree({
             gitStatusLabelByStatus={gitStatusLabelByStatus}
             contextMenuLabels={fileContextMenuLabels}
             editorState={editorState}
+            fileOps={fileOps}
             onSelect={setSelectedPath}
             onToggleDirectory={handleDirectoryAction}
             onOpenPreview={handleOpenPreview}
@@ -788,6 +1047,42 @@ export function WorkspaceFileTree({
           />
         </div>
       </div>
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {intl.formatMessage({ id: "workspaceFileTree.deleteConfirmTitle" })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {intl.formatMessage(
+                {
+                  id:
+                    pendingDelete?.kind === "directory"
+                      ? "workspaceFileTree.deleteConfirmDirectory"
+                      : "workspaceFileTree.deleteConfirmFile",
+                },
+                { name: pendingDelete?.name ?? "" },
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{intl.formatMessage({ id: "common.cancel" })}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void handleConfirmDelete()}
+            >
+              {fileContextMenuLabels.delete}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

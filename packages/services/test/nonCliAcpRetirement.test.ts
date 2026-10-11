@@ -125,7 +125,9 @@ test("missing sessions report the owner error even when a valid ACP snapshot exi
       onSessionReadyEvent: disposable,
       disposeAll() {},
     } as unknown as Options["taskIndexSyncer"],
-  });
+    // disposeAll 是 host 生命周期钩子，不在 IZCodeTaskService 接口上声明；
+    // node.ts 用结构探测调用，测试里同样按结构类型断言。
+  }) as ReturnType<typeof createZCodeTaskServiceAdapter> & { disposeAll(): void };
   try {
     for (const clientMode of ["desktop-continuous", "web-remote-replayable"] as const) {
       await assert.rejects(
@@ -206,7 +208,7 @@ test("current session recovery preserves Desktop and replayable projections", as
       ensureSessionSubscription() {},
       disposeAll() {},
     } as unknown as Options["taskIndexSyncer"],
-  });
+  }) as ReturnType<typeof createZCodeTaskServiceAdapter> & { disposeAll(): void };
   try {
     const desktop = await service.getTaskSnapshot({ ...meta, clientMode: "desktop-continuous" });
     const mobile = await service.getTaskSnapshot({ ...meta, clientMode: "web-remote-replayable" });

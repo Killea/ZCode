@@ -57,6 +57,7 @@ export async function recheckPermissionHookModifiedInput(input: {
     decision,
     executionInput: input.modifiedInput,
     memoryRoot: input.deps.getMemoryRoot?.(),
+    memoryGlobalRoot: input.deps.getMemoryGlobalRoot?.(),
     toolName: input.toolCall.name,
     workingDirectory: input.deps.getWorkingDirectory(),
     workspaceRoot: input.deps.getWorkspaceRoot(),
@@ -74,6 +75,7 @@ export async function recheckPermissionHookModifiedInput(input: {
       !targetsMemoryFile({
         executionInput: input.modifiedInput,
         memoryRoot: input.deps.getMemoryRoot?.(),
+        memoryGlobalRoot: input.deps.getMemoryGlobalRoot?.(),
         toolName: input.toolCall.name,
         workingDirectory: input.deps.getWorkingDirectory(),
         workspaceRoot: input.deps.getWorkspaceRoot(),

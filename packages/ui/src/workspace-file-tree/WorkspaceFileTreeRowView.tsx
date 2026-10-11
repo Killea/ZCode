@@ -44,7 +44,14 @@ import {
 import type {
   WorkspaceFileGitStatusLabels,
   WorkspaceFileTreeContextMenuLabels,
+  WorkspaceFileTreeEditingSession,
 } from "@/workspace-file-tree/types.js";
+import { WorkspaceFileTreeEditingInput } from "@/workspace-file-tree/WorkspaceFileTreeEditingInput.js";
+import {
+  createWorkspaceFileTreeEditingSession,
+  createWorkspaceFileTreeRenameSession,
+  resolveWorkspaceFileCreateParentPath,
+} from "@/workspace-file-tree/workspaceFileEdit.js";
 import {
   createWorkspaceFileTreeHtmlBrowserUrl,
   isWorkspaceFileTreeHtmlFile,
@@ -73,6 +80,14 @@ export function WorkspaceFileTreeRowView({
   onOpenPreview,
   onOpenBrowserUrl,
   onKeyDown,
+  editingSession,
+  editingDisabled = false,
+  editingInvalidMessage = "",
+  onStartEditing,
+  onRequestDelete,
+  onCommitEditing,
+  onCancelEditing,
+  onEditingInvalid,
 }: {
   layout?: "absolute" | "static";
   row: WorkspaceFileTreeRow;
@@ -93,6 +108,17 @@ export function WorkspaceFileTreeRowView({
   onOpenPreview: (row: WorkspaceFileTreeRow) => void;
   onOpenBrowserUrl?: (url: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>, row: WorkspaceFileTreeRow) => void;
+  /** 当前行内编辑会话；本行命中 rename/draft 时渲染输入框。 */
+  editingSession?: WorkspaceFileTreeEditingSession | null;
+  /** 搜索/过滤态下新建与改名入口禁用，避免草稿行落在错误的可见集里。 */
+  editingDisabled?: boolean;
+  onStartEditing?: (session: WorkspaceFileTreeEditingSession) => void;
+  onRequestDelete?: (row: WorkspaceFileTreeRow) => void;
+  onCommitEditing?: (session: WorkspaceFileTreeEditingSession, name: string) => void;
+  onCancelEditing?: (session: WorkspaceFileTreeEditingSession) => void;
+  onEditingInvalid?: (message: string) => void;
+  /** 行内输入非法名称时的提示文案；toast 用。 */
+  editingInvalidMessage?: string;
 }) {
   const platform = usePlatform();
   const { isDragging, setIsDragging } = useWorkspaceFileTreeRowDragState();
@@ -207,6 +233,51 @@ export function WorkspaceFileTreeRowView({
       kind: isDirectory ? "directory" : "file",
     });
   };
+  const canMutateEntry =
+    !isDeletedFile && !editingDisabled && Boolean(onStartEditing) && Boolean(onRequestDelete);
+  const isRenameEditing =
+    editingSession?.mode === "rename" && editingSession.targetPath === row.path;
+  const editingInput =
+    editingSession && onCommitEditing && onCancelEditing ? (
+      <WorkspaceFileTreeEditingInput
+        session={editingSession}
+        invalidMessage={editingInvalidMessage}
+        onCommit={onCommitEditing}
+        onCancel={onCancelEditing}
+        onInvalid={(message) => (onEditingInvalid ? onEditingInvalid(message) : toast(message))}
+      />
+    ) : null;
+  const handleStartCreate = (mode: "create-file" | "create-directory") => {
+    const parentPath = resolveWorkspaceFileCreateParentPath(row);
+    if (parentPath) {
+      onStartEditing?.(createWorkspaceFileTreeEditingSession({ mode, parentPath }));
+    }
+  };
+  // create 草稿行只负责命名输入：不参与选中/拖拽/右键，避免半成品条目泄漏到操作链路。
+  if (row.editing === "create") {
+    return (
+      <div
+        className={cn(layout === "absolute" ? "absolute left-0 top-0 w-full px-1" : "w-full")}
+        style={rowStyle}
+      >
+        <div
+          role="treeitem"
+          className={cn(
+            "relative flex h-7 w-full min-w-0 items-center gap-1.5 rounded-lg border border-input-border-focused pr-2 py-1 text-ui-base text-foreground",
+            "pl-[calc(var(--workspace-file-tree-depth)*0.75rem+0.5rem)]",
+          )}
+        >
+          {isDirectory ? (
+            <span className="flex size-4 shrink-0 items-center justify-center text-foreground-subtle">
+              <ChevronRight aria-hidden="true" className="size-3 text-foreground-subtlest" />
+            </span>
+          ) : null}
+          {fileIconSrc ? <FileDisplayIcon src={fileIconSrc} className="shrink-0 size-4" /> : null}
+          {editingInput}
+        </div>
+      </div>
+    );
+  }
   const rowElement = (
     <div
       role="treeitem"
@@ -279,11 +350,15 @@ export function WorkspaceFileTreeRowView({
       ) : null}
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
         {fileIconSrc ? <FileDisplayIcon src={fileIconSrc} className="shrink-0 size-4" /> : null}
-        <WorkspaceFileTreeRowName
-          name={row.name}
-          className={cn("min-w-0 flex-1 truncate", rowStatusTextClassName)}
-          slashClassName="mx-1 text-foreground-subtlest"
-        />
+        {isRenameEditing && editingInput ? (
+          editingInput
+        ) : (
+          <WorkspaceFileTreeRowName
+            name={row.name}
+            className={cn("min-w-0 flex-1 truncate", rowStatusTextClassName)}
+            slashClassName="mx-1 text-foreground-subtlest"
+          />
+        )}
       </span>
       {gitStatusText && gitStatusLabel ? (
         <ControlHintTooltip
@@ -386,6 +461,32 @@ export function WorkspaceFileTreeRowView({
           </ContextMenuItem>
           <ContextMenuItem onSelect={() => void handleCopyRelativePath()}>
             {contextMenuLabels.copyRelativePath}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            disabled={!canMutateEntry}
+            onSelect={() => handleStartCreate("create-file")}
+          >
+            {contextMenuLabels.newFile}
+          </ContextMenuItem>
+          <ContextMenuItem
+            disabled={!canMutateEntry}
+            onSelect={() => handleStartCreate("create-directory")}
+          >
+            {contextMenuLabels.newFolder}
+          </ContextMenuItem>
+          <ContextMenuItem
+            disabled={!canMutateEntry}
+            onSelect={() => onStartEditing?.(createWorkspaceFileTreeRenameSession(row))}
+          >
+            {contextMenuLabels.rename}
+          </ContextMenuItem>
+          <ContextMenuItem
+            variant="destructive"
+            disabled={!canMutateEntry}
+            onSelect={() => onRequestDelete?.(row)}
+          >
+            {contextMenuLabels.delete}
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={() => dispatchWorkspaceFileAddToChat(workspaceFilePayload)}>

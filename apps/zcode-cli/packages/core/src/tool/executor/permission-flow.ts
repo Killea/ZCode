@@ -94,6 +94,7 @@ export async function resolveToolPermission(
     decision: permissionDecision,
     executionInput,
     memoryRoot: deps.getMemoryRoot?.(),
+    memoryGlobalRoot: deps.getMemoryGlobalRoot?.(),
     toolName: toolCall.name,
     workingDirectory: deps.getWorkingDirectory(),
     workspaceRoot: deps.getWorkspaceRoot(),

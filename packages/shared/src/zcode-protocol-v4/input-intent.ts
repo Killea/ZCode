@@ -49,6 +49,7 @@ export const conversationInputIntentSchema = z
     modelSelection: modelSelectionSchema.optional(),
     mode: submissionModeSchema.optional(),
     planEnabled: z.boolean().optional(),
+    includeGlobalMemory: z.boolean().optional(),
     sharedContextRefs: z.array(sharedContextRefSchema).max(1).optional(),
     delivery: conversationInputDeliverySchema,
     order: conversationInputOrderSchema,

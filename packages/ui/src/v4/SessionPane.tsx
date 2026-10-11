@@ -2533,6 +2533,12 @@ export function SessionPane({
       };
       // 进入 barrier 前已经冻结；等待配置/附件期间不再回读 Composer 或 Session。
       let submission = options?.submission ?? null;
+      // 逐条 opt-in：把 composer 的"本次消息携带全局记忆"意图冻结进本次 submission；
+      // 后续各 payload 站点（sendText / createSession firstInput）经 ...submission 统一携带，
+      // 避免逐处透传。缺省/ false 时不写入，保持默认不携带。
+      if (options?.includeGlobalMemory === true && submission) {
+        submission = { ...submission, includeGlobalMemory: true };
+      }
       const heldQueueDisposition = options?.heldQueueDisposition;
       const expectedHeldQueueItemIds = options?.expectedHeldQueueItemIds;
       const readyAttachments = options?.attachments ?? [];
@@ -4373,6 +4379,7 @@ export function SessionPane({
       // 只给 Skill catalog 下发 effective id，避免 UI 扫到 prewarm runtime 尚未加载的新 Skill。
       skillCatalogSessionId={effectiveSessionId}
       draftMode={isDraft}
+      globalMemoryEnabled={sharedSettings?.globalMemoryEnabled === true}
       draftConfig={draftConfig}
       composerDraft={composerDraft}
       replaceComposerDraft={replaceComposerDraft}

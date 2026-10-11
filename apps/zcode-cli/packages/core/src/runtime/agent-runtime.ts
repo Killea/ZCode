@@ -164,6 +164,10 @@ export class AgentRuntime {
   private latestContextBuildResult?: ContextBuildResult;
   private memoryRoot?: string;
   private memoryIndexContent?: string;
+  private globalMemoryFile?: string;
+  private globalMemoryContent?: string;
+  /** 仅当前 Turn 用户显式选择携带全局记忆时为 true；每轮开始重置，默认 false。 */
+  private turnGlobalMemoryIncluded?: boolean;
   private memoryExtractionScheduler?: ProjectMemoryExtractionScheduler;
   private contextSourcePort?: ContextSourcePort;
   private skillPort?: SkillPort;

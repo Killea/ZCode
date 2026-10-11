@@ -18,6 +18,8 @@ export function rebuildContextPrefix(
         runtime.memoryRoot,
         {
           memoryIndexContent: runtime.memoryIndexContent,
+          globalMemoryFile: runtime.globalMemoryFile,
+          globalMemoryContent: runtime.globalMemoryContent,
           model: options.model,
           persistEnvInfo: false,
         },
@@ -32,7 +34,12 @@ export function rebuildContextPrefix(
   runtime.contextBuilder = runtime.createContextBuilderFromSnapshot(
     contextSnapshot,
     runtime.memoryRoot,
-    { memoryIndexContent: runtime.memoryIndexContent, model: options.model },
+    {
+      memoryIndexContent: runtime.memoryIndexContent,
+      globalMemoryFile: runtime.globalMemoryFile,
+      globalMemoryContent: runtime.globalMemoryContent,
+      model: options.model,
+    },
   );
   const effectiveContextResult = runtime.contextBuilder.build();
   const contextEntries = buildContextHistoryEntries(effectiveContextResult);

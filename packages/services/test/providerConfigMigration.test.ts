@@ -78,7 +78,12 @@ test("startup migrates published ZCode config into personal config without chang
     assert.ok(rule);
     assert.equal(rule.providerName, "Example provider");
     assert.equal(rule.enabled, false);
-    assert.equal(rule.config.access?.toJSON().apiKey, "test-only-key");
+    const access = rule.config.access?.toJSON();
+    // access 是 api-key / zhipu-account 的判别联合，apiKey 只在 api-key 变体上存在。
+    if (access?.type !== "api-key") {
+      assert.fail("expected api-key access config");
+    }
+    assert.equal(access.apiKey, "test-only-key");
     assert.equal(rule.config.api?.baseUrl, "https://provider.example/v1");
     assert.deepEqual(rule.config.api?.headers, { "X-Example": "test" });
     assert.deepEqual(rule.config.personalModelIds, ["model-b", "model-a"]);

@@ -679,6 +679,7 @@ export function SettingsPage({
     return [...names];
   }, [sharedSettings?.recentProjects, workspaceTabs]);
   const memoryEnabled = sharedSettings?.memoryEnabled === true;
+  const globalMemoryEnabled = sharedSettings?.globalMemoryEnabled === true;
   const nativeSearchEnhancementsEnabled = sharedSettings?.nativeSearchEnhancementsEnabled !== false;
   const askUserQuestionAutoResolutionEnabled =
     sharedSettings?.askUserQuestionAutoResolutionEnabled !== false;
@@ -937,6 +938,23 @@ export function SettingsPage({
             .catch((cause: unknown) => {
               console.warn("[settings] 回写引导记录失败", String(cause));
             });
+        },
+        completed: {
+          resultSource: "shared_settings",
+          stateAfter: enabled ? "enabled" : "disabled",
+        },
+      });
+    },
+    [updateSharedSettings],
+  );
+  const handleGlobalMemoryEnabledChange = useCallback(
+    async (enabled: boolean) => {
+      await runSettingsActionAsync({
+        featureId: "settings.memory",
+        action: "toggle_global_memory",
+        trigger: "switch",
+        operation: async () => {
+          await updateSharedSettings({ globalMemoryEnabled: enabled });
         },
         completed: {
           resultSource: "shared_settings",
@@ -1828,6 +1846,8 @@ export function SettingsPage({
                               memoryEnabled={memoryEnabled}
                               memoryService={localHostServices.memoryService}
                               onMemoryEnabledChange={handleMemoryEnabledChange}
+                              globalMemoryEnabled={globalMemoryEnabled}
+                              onGlobalMemoryEnabledChange={handleGlobalMemoryEnabledChange}
                               projectMemoryViewerAvailable={Boolean(isDesktop)}
                               workspaceDisplayNames={memoryWorkspaceDisplayNames}
                             />

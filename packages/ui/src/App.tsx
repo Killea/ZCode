@@ -228,6 +228,8 @@ export function App({
     handleOpenBrowserTab,
     handleToggleGit,
     handleOpenGit,
+    handleToggleFileTree,
+    handleOpenFileTree,
     handleOpenTreemapping,
     handleOpenWhiteboard,
     handleOpenDeveloperTools,
@@ -409,6 +411,7 @@ export function App({
   const activeSidePaneTab = useMemo(() => getActiveSidePaneTab(sidePaneState), [sidePaneState]);
   const isBrowserOpen = activeSidePaneTab?.type === "browser";
   const isGitOpen = activeSidePaneTab?.type === "git";
+  const isFileTreeOpen = activeSidePaneTab?.type === "file-tree";
   const hasGitTab = sidePaneState?.tabs.some((tab) => tab.type === "git") ?? false;
   const handleRefreshGit = useCallback(() => {
     setGitRefreshVersion((value) => value + 1);
@@ -1188,6 +1191,7 @@ export function App({
         isBrowserOpen={isBrowserOpen}
         supportsEmbeddedBrowser={supportsEmbeddedBrowser}
         isGitOpen={isGitOpen}
+        isFileTreeOpen={isFileTreeOpen}
         isSidePaneOpen={isSidePaneOpen}
         summaryPanelVariantOverride={summaryPanelVariantOverride}
         onSummaryPanelVariantOverrideChange={setSummaryPanelVariantOverride}
@@ -1246,6 +1250,8 @@ export function App({
         handleOpenDeveloperTools={handleOpenDeveloperTools}
         handleOpenTerminalTab={handleOpenTerminalTabIfWritable}
         handleToggleGit={handleToggleGitIfWritable}
+        handleToggleFileTree={handleToggleFileTree}
+        handleOpenFileTree={handleOpenFileTree}
         handleToggleSidePane={handleToggleSidePane}
         handleOpenBrowserUrl={handleOpenBrowserUrl}
         handleOpenCodeViewer={handleOpenCodeViewerIfWritable}

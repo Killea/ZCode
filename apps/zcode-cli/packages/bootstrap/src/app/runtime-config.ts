@@ -176,6 +176,9 @@ export function resolveAppRuntimeConfig(input: {
     memory: {
       cliStorageRoot,
       enabled: options.runtimeConfig?.memory?.enabled ?? configResult.config.features.memory,
+      ...(options.runtimeConfig?.memory?.globalEnabled === undefined
+        ? {}
+        : { globalEnabled: options.runtimeConfig.memory.globalEnabled }),
       ...(options.runtimeConfig?.memory?.extractionEnabled === undefined
         ? {}
         : { extractionEnabled: options.runtimeConfig.memory.extractionEnabled }),

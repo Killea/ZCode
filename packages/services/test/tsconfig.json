@@ -1,0 +1,15 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  // test 文件不属于 packages/services 的 tsc -b 工程（其 include 只覆盖 src/，
+  // rootDir/outDir 也按 src 布局设置）。这里的独立 config 只服务编辑器与
+  // 单文件 typecheck；services 为纯 node 包，types 与其主工程一致限定 node。
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "lib": ["es2025"],
+    "types": ["node"]
+  },
+  "include": ["*.ts"]
+}

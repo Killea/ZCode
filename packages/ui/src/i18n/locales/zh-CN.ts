@@ -662,6 +662,8 @@ const zhCN: Record<string, string> = {
   "sidePane.openFile.category": "文件",
   "sidePane.openFile.emptyQuery": "输入内容搜索文件",
   "sidePane.review": "审查",
+  "sidePane.files": "文件",
+  "files.toggle": "切换文件面板",
   "whiteboard.title": "画板",
   "whiteboard.defaultName": "画板",
   "whiteboard.nameLabel": "画板名称",
@@ -1277,6 +1279,15 @@ const zhCN: Record<string, string> = {
   "workspaceFileTree.openInBrowser": "用内置浏览器打开",
   "workspaceFileTree.openFailed": "无法打开该条目",
   "workspaceFileTree.addToChat": "添加到聊天",
+  "workspaceFileTree.newFile": "新建文件",
+  "workspaceFileTree.newFolder": "新建文件夹",
+  "workspaceFileTree.rename": "重命名",
+  "workspaceFileTree.delete": "删除",
+  "workspaceFileTree.deleteConfirmTitle": "删除该条目？",
+  "workspaceFileTree.deleteConfirmFile": "「{name}」将被永久删除，此操作无法撤销。",
+  "workspaceFileTree.deleteConfirmDirectory":
+    "「{name}」及其全部内容将被永久删除，此操作无法撤销。",
+  "workspaceFileTree.editingInvalidName": "名称不能为空，也不能包含路径分隔符。",
   "workspaceFileTree.gitStatus.ignored": "已忽略",
 
   // SSH 对话框
@@ -1715,6 +1726,19 @@ const zhCN: Record<string, string> = {
     "在新建会话或应用重启后恢复的会话中使用增强 Find 和 Grep。当前会话保持现有设置；Windows 的 Find 保持不变。",
   "settings.memory": "记忆",
   "settings.memory.workspaceMemory": "工作区记忆",
+  "settings.memory.tab.workspace": "工作区记忆",
+  "settings.memory.tab.global": "全局记忆",
+  "settings.memory.global.switchTitle": "全局记忆",
+  "settings.memory.global.description":
+    "跨所有工作区共享的单个文件（最多 2048 个字符）。注入主 agent 的上下文；仅在你明确要求时 agent 才会编辑它。",
+  "settings.memory.global.editorLabel": "全局记忆内容",
+  "settings.memory.global.charCount": "{count} / {limit} 字符",
+  "settings.memory.global.empty": "暂无全局记忆。在此填写跨工作区共享的上下文。",
+  "settings.memory.global.save": "保存",
+  "settings.memory.global.saved": "全局记忆已保存。",
+  "settings.memory.global.saveFailed": "保存全局记忆失败。",
+  "settings.memory.global.loadFailed": "读取全局记忆失败。",
+  "settings.memory.global.unsaved": "有未保存的修改",
   "settings.memoryDescription":
     "在工作区中保存并复用长期上下文，新会话生效。开启后可能增加模型调用和 Token 成本。",
   "settings.memory.viewer.localOnly":
@@ -4248,6 +4272,13 @@ const zhCN: Record<string, string> = {
   "chat.toolbar.computerUse.tooltip.sessionBusy":
     "会话进行中，暂不能切换电脑操作；任务结束后可再试",
   "chat.toolbar.mode.description": "切换当前任务的权限/执行模式，例如默认、计划或接受编辑。",
+  "chat.toolbar.globalMemory.label": "全局记忆",
+  "chat.toolbar.globalMemory.labelOn": "本次携带全局记忆",
+  "chat.toolbar.globalMemory.labelOff": "本次不带全局记忆",
+  "chat.toolbar.globalMemory.tooltipOn": "本次消息将携带全局记忆（跨工作区共享）；发送后自动关闭。",
+  "chat.toolbar.globalMemory.tooltipOff":
+    "默认不携带全局记忆；打开后仅本次消息携带，发送后自动关闭。",
+  "chat.toolbar.recentPrompts.label": "最近的输入",
   "chat.toolbar.thoughtLevel.label": "推理强度",
   "chat.toolbar.thoughtLevel.tooltip": "思考级别",
   "chat.toolbar.thoughtLevel.placeholder": "选择思考档位",

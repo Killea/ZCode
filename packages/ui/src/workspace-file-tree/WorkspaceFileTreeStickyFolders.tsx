@@ -11,6 +11,7 @@ import type {
   WorkspaceFileGitStatusLabels,
   WorkspaceFileTreeContextMenuLabels,
   WorkspaceFileTreeEditorState,
+  WorkspaceFileTreeFileOps,
   WorkspaceFileTreeStickyFolderItem,
 } from "@/workspace-file-tree/types.js";
 
@@ -22,6 +23,7 @@ export function WorkspaceFileTreeStickyFolders({
   gitStatusLabelByStatus,
   contextMenuLabels,
   editorState,
+  fileOps,
   workspacePath,
   workspaceIdentity,
   onSelect,
@@ -38,6 +40,7 @@ export function WorkspaceFileTreeStickyFolders({
   gitStatusLabelByStatus: WorkspaceFileGitStatusLabels;
   contextMenuLabels: WorkspaceFileTreeContextMenuLabels;
   editorState: WorkspaceFileTreeEditorState;
+  fileOps: WorkspaceFileTreeFileOps;
   workspacePath: string;
   workspaceIdentity?: string;
   onSelect: (path: string) => void;
@@ -87,6 +90,7 @@ export function WorkspaceFileTreeStickyFolders({
               onOpenPreview={onOpenPreview}
               onOpenBrowserUrl={onOpenBrowserUrl}
               onKeyDown={onKeyDown}
+              {...fileOps}
             />
           );
         })}

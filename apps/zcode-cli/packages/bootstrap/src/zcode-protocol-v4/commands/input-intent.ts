@@ -10,6 +10,7 @@ interface CanonicalCommandIntent {
   modelSelection?: ModelSelection;
   mode?: SubmissionMode;
   planEnabled?: boolean;
+  includeGlobalMemory?: boolean;
   sourceCommandId?: string;
   clientId?: string;
   queueItemId?: string;
@@ -32,6 +33,7 @@ export function inputIntentMetadata(
     modelSelection?: ModelSelection;
     mode?: SubmissionMode;
     planEnabled?: boolean;
+    includeGlobalMemory?: boolean;
     sharedContextRefs?: TurnInputIntentMetadata["sharedContextRefs"];
   },
 ): TurnInputIntentMetadata {
@@ -52,6 +54,9 @@ export function inputIntentMetadata(
     ...(options.modelSelection ? { modelSelection: options.modelSelection } : {}),
     ...(options.mode ? { mode: options.mode } : {}),
     ...(options.planEnabled !== undefined ? { planEnabled: options.planEnabled } : {}),
+    ...(options.includeGlobalMemory !== undefined
+      ? { includeGlobalMemory: options.includeGlobalMemory }
+      : {}),
     admissionSeq: admission.admissionSeq,
     admittedAt: admission.admittedAt,
     requestedDelivery: options.requestedDelivery,
@@ -86,6 +91,9 @@ export function inputIntentMetadataFromCanonical(
     ...(canonical.modelSelection ? { modelSelection: canonical.modelSelection } : {}),
     ...(canonical.mode ? { mode: canonical.mode } : {}),
     ...(canonical.planEnabled !== undefined ? { planEnabled: canonical.planEnabled } : {}),
+    ...(canonical.includeGlobalMemory !== undefined
+      ? { includeGlobalMemory: canonical.includeGlobalMemory }
+      : {}),
     admissionSeq: admission.admissionSeq,
     admittedAt: admission.admittedAt,
     requestedDelivery: canonical.requestedDelivery ?? "startNow",
@@ -119,6 +127,9 @@ export function inputIntentMetadataFromQueueItem(
     ...(item.modelSelection ? { modelSelection: item.modelSelection } : {}),
     ...(item.mode ? { mode: item.mode } : {}),
     ...(item.planEnabled !== undefined ? { planEnabled: item.planEnabled } : {}),
+    ...(item.includeGlobalMemory !== undefined
+      ? { includeGlobalMemory: item.includeGlobalMemory }
+      : {}),
     admissionSeq: item.order.admissionSeq,
     admittedAt: item.admittedAt,
     requestedDelivery: item.delivery.requested,

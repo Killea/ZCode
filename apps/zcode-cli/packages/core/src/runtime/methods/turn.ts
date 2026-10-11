@@ -107,6 +107,10 @@ export async function executeTurnCommand(
   const turnId = startReservation?.turnId ?? createTurnId();
   const queryId = options?.queryId ?? (options?.inputId as QueryId | undefined) ?? createQueryId();
   const displayInput = options?.displayInput ?? input;
+  // 全局记忆改为逐条 opt-in：仅本轮用户显式携带（intent.includeGlobalMemory）才注入。
+  // 在任何 await 之前写定本轮事实；后续 context 重建（含首轮初始化）都读这一字段，
+  // 下一轮开始时按该轮自身的 intent 重新赋值，天然做到"发送一次后自动关闭"。
+  this.turnGlobalMemoryIncluded = options?.intent?.includeGlobalMemory === true;
   const turnTraceContext =
     startReservation?.traceContext ??
     createChildTraceContext(options?.traceContext ?? this.rootTraceContext, {

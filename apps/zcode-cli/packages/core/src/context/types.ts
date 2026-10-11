@@ -37,6 +37,7 @@ export type ContextSource =
   | "tools" // 工具定义
   | "request_user_context" // request-level user context provider-visible 组合块
   | "memory" // 长期 memory read path
+  | "global_memory" // 全局（跨工作区）记忆内容
   | "current_date" // 当前日期
   | "custom_system_prompt" // 自定义 stable system body
   | "workflow_actor_identity" // 动态工作流子代理身份：契约 + persona 叠加
@@ -110,6 +111,12 @@ export interface ContextBuilderConfig {
   projectContext?: ProjectContext;
   memoryRoot?: string;
   memoryIndexContent?: string;
+  /** 全局（跨工作区）记忆单文件路径；在场即代表全局记忆总开关已开启。 */
+  globalMemoryFile?: string;
+  /** 全局记忆内容（已按 2048 字符截断）；可为空串。 */
+  globalMemoryContent?: string;
+  /** 仅当前 Turn 用户显式 opt-in 时注入；总开关开但本轮未选择时为 false，默认不注入。 */
+  globalMemoryIncluded?: boolean;
   skills?: SkillLoadOutcome;
   agentProfiles?: readonly AgentProfile[];
   embeddedSearchEnabled?: boolean;

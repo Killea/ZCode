@@ -1,4 +1,5 @@
 import { WorkspaceEditorButtonGroup } from "@/WorkspaceEditorButtonGroup.js";
+import { WorkspaceFilesToggleButton } from "@/WorkspaceFilesToggleButton.js";
 import { WorkspaceSidePaneToggleButton } from "@/WorkspaceSidePaneToggleButton.js";
 import { WorkspaceTerminalToggleButton } from "@/WorkspaceTerminalToggleButton.js";
 import { cn } from "@/components/lib/utils.js";
@@ -20,7 +21,9 @@ export function WorkspaceHeaderActionSection({
   isDesktop,
   isTerminalOpen,
   isSidePaneOpen,
+  isFilesPaneOpen,
   onToggleTerminal,
+  onToggleFiles,
   onToggleSidePane,
   toggleSidePaneShortcutLabel,
   onSelectedEditorChange,
@@ -62,6 +65,11 @@ export function WorkspaceHeaderActionSection({
             isTerminalOpen={isTerminalOpen}
             onToggleTerminal={onToggleTerminal}
             disabledReason={readOnlyReason}
+            useWindowsCaptionSpacing={useWindowsCaptionSpacing}
+          />
+          <WorkspaceFilesToggleButton
+            isFilesPaneOpen={isFilesPaneOpen}
+            onToggleFiles={onToggleFiles}
             useWindowsCaptionSpacing={useWindowsCaptionSpacing}
           />
         </>

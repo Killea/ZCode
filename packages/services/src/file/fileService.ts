@@ -27,6 +27,11 @@ import {
   transformWorkspaceFileSearchIgnore,
   writeWorkspaceFileSearchIgnore,
 } from "./workspaceFileIgnore.js";
+import {
+  createWorkspaceEntry,
+  deleteWorkspaceEntry,
+  renameWorkspaceEntry,
+} from "./workspaceFileOps.js";
 import { createServiceLogger } from "../logger/serviceLogger.js";
 import { getConversationWorkspaceDir } from "../paths.js";
 const DEFAULT_TEXT_READ_BYTES = 128 * 1024;
@@ -637,6 +642,24 @@ export function createFileService(options: CreateFileServiceOptions = {}): IFile
       content: string;
     }): Promise<void> {
       await writeWorkspaceFileSearchIgnore(params.rootPath, params.content);
+    },
+    async createWorkspaceEntry(params: {
+      rootPath: string;
+      parentPath: string;
+      name: string;
+      kind: "file" | "directory";
+    }): Promise<{ path: string }> {
+      return createWorkspaceEntry(params);
+    },
+    async renameWorkspaceEntry(params: {
+      rootPath: string;
+      path: string;
+      newName: string;
+    }): Promise<{ path: string }> {
+      return renameWorkspaceEntry(params);
+    },
+    async deleteWorkspaceEntry(params: { rootPath: string; path: string }): Promise<void> {
+      await deleteWorkspaceEntry(params);
     },
   };
 }

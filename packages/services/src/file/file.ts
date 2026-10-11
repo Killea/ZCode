@@ -77,6 +77,31 @@ export interface IFileService {
     transform: "sync-gitignore" | "reset-defaults";
   }): Promise<{ content: string }>;
   writeWorkspaceFileSearchIgnore(params: { rootPath: string; content: string }): Promise<void>;
+  /**
+   * 文件树新建：在 rootPath 内的 parentPath 下创建文件或目录。
+   * name 不允许路径分隔符；文件走独占创建、目录不带 recursive，
+   * 目标已存在时报错不覆盖。
+   */
+  createWorkspaceEntry(params: {
+    rootPath: string;
+    parentPath: string;
+    name: string;
+    kind: "file" | "directory";
+  }): Promise<{ path: string }>;
+  /**
+   * 文件树重命名：仅同目录改名，newName 不允许路径分隔符；
+   * 目标已存在时报错（POSIX rename 默认覆盖语义需显式拒绝）。
+   */
+  renameWorkspaceEntry(params: {
+    rootPath: string;
+    path: string;
+    newName: string;
+  }): Promise<{ path: string }>;
+  /**
+   * 文件树删除：永久删除（目录递归），不进回收站；
+   * 拒绝删除 rootPath 本身或根外路径。
+   */
+  deleteWorkspaceEntry(params: { rootPath: string; path: string }): Promise<void>;
 }
 
 export const IFileService = createServiceDescriptor<IFileService>(ServiceChannels.File);

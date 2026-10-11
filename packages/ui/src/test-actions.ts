@@ -4,13 +4,6 @@ import type { IZCodeAgentService } from "@zcode/services";
 import type { TaskListE2EActions } from "@/lib/taskListE2EActions.js";
 import { useEffect } from "react";
 
-// Vite 注入的 import.meta.env 类型声明
-declare global {
-  interface ImportMeta {
-    env: { PROD: boolean; DEV: boolean; [key: string]: unknown };
-  }
-}
-
 /**
  * E2E 测试可通过 window.__testActions 调用的操作集合。
  * 仅在非 production 环境下注册，避免泄露到生产。

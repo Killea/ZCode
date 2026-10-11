@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type IMemoryService, type ProjectMemoryWorkspaceSummary } from "@zcode/services";
-import { TID_SETTINGS_MEMORY_SWITCH } from "@zcode/shared";
+import { TID_SETTINGS_MEMORY_GLOBAL_SWITCH, TID_SETTINGS_MEMORY_SWITCH } from "@zcode/shared";
 import { runUserAction, runUserActionAsync } from "@/lib/userActionTelemetry.js";
 import { Switch } from "@/components/ui/switch.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
@@ -9,8 +9,13 @@ import {
   type MemoryViewerLoadingState,
 } from "@/settings/MemorySettingsViewer.js";
 import { SettingsGroupCard, SettingsRow } from "@/settings/SettingsPageParts.js";
+import { SettingsSegmentedTabs } from "@/settings/SettingsSegmentedTabs.js";
+import { GlobalMemoryEditor } from "@/settings/GlobalMemoryEditor.js";
 
-type MemoryCatalogService = Pick<IMemoryService, "listProjectMemories">;
+type MemoryCatalogService = Pick<
+  IMemoryService,
+  "listProjectMemories" | "readGlobalMemoryFile" | "writeGlobalMemoryFile"
+>;
 
 function normalizeWorkspaceDisplayName(value: string): string {
   const slug = value
@@ -47,16 +52,21 @@ export function MemorySettingsSection({
   memoryEnabled,
   memoryService,
   onMemoryEnabledChange,
+  globalMemoryEnabled,
+  onGlobalMemoryEnabledChange,
   projectMemoryViewerAvailable,
   workspaceDisplayNames = [],
 }: {
   memoryEnabled: boolean;
   memoryService: MemoryCatalogService;
   onMemoryEnabledChange: (enabled: boolean) => Promise<void>;
+  globalMemoryEnabled: boolean;
+  onGlobalMemoryEnabledChange: (enabled: boolean) => Promise<void>;
   projectMemoryViewerAvailable: boolean;
   workspaceDisplayNames?: readonly string[];
 }) {
   const { intl } = useZCodeIntl();
+  const [activeTab, setActiveTab] = useState<"workspace" | "global">("workspace");
   const catalogRequestIdRef = useRef(0);
   const [catalogState, setCatalogState] = useState<MemoryViewerLoadingState>("idle");
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -152,54 +162,112 @@ export function MemorySettingsSection({
   }, [refreshCatalog]);
 
   return (
-    <div className="space-y-6">
-      <SettingsGroupCard>
-        <SettingsRow
-          label={intl.formatMessage({
-            id: "settings.memory.workspaceMemory",
-          })}
-          description={intl.formatMessage({
-            id: "settings.memoryDescription",
-          })}
-          control={
-            <Switch
-              aria-label={intl.formatMessage({
+    <div className="space-y-4">
+      <SettingsSegmentedTabs
+        value={activeTab}
+        items={[
+          {
+            value: "workspace",
+            label: intl.formatMessage({ id: "settings.memory.tab.workspace" }),
+          },
+          {
+            value: "global",
+            label: intl.formatMessage({ id: "settings.memory.tab.global" }),
+          },
+        ]}
+        onValueChange={(next) =>
+          runUserAction({
+            input: { featureId: "settings.memory", action: "switch_memory_tab", trigger: "select" },
+            operation: () => setActiveTab(next),
+            completed: { resultSource: "local_commit" },
+            failureStage: "local_commit",
+          })
+        }
+      />
+
+      {activeTab === "workspace" ? (
+        <div className="space-y-6">
+          <SettingsGroupCard>
+            <SettingsRow
+              label={intl.formatMessage({
                 id: "settings.memory.workspaceMemory",
               })}
-              checked={memoryEnabled}
-              data-testid={TID_SETTINGS_MEMORY_SWITCH}
-              onCheckedChange={(checked) => {
-                void onMemoryEnabledChange(checked);
-              }}
+              description={intl.formatMessage({
+                id: "settings.memoryDescription",
+              })}
+              control={
+                <Switch
+                  aria-label={intl.formatMessage({
+                    id: "settings.memory.workspaceMemory",
+                  })}
+                  checked={memoryEnabled}
+                  data-testid={TID_SETTINGS_MEMORY_SWITCH}
+                  onCheckedChange={(checked) => {
+                    void onMemoryEnabledChange(checked);
+                  }}
+                />
+              }
             />
-          }
-        />
-      </SettingsGroupCard>
+          </SettingsGroupCard>
 
-      {!projectMemoryViewerAvailable ? (
-        <div className="rounded-xl border border-dashed border-border bg-transparent px-4 py-8 text-center text-ui-base text-foreground-subtle">
-          {intl.formatMessage({ id: "settings.memory.viewer.localOnly" })}
+          {!projectMemoryViewerAvailable ? (
+            <div className="rounded-xl border border-dashed border-border bg-transparent px-4 py-8 text-center text-ui-base text-foreground-subtle">
+              {intl.formatMessage({ id: "settings.memory.viewer.localOnly" })}
+            </div>
+          ) : !memoryEnabled ? null : (
+            <MemorySettingsViewer
+              catalogError={catalogError}
+              catalogState={catalogState}
+              selectedWorkspace={selectedWorkspace}
+              workspaces={displayWorkspaces}
+              onRefresh={handleRefresh}
+              onScopeKeyChange={(workspaceId) =>
+                runUserAction({
+                  input: {
+                    featureId: "settings.memory",
+                    action: "change_memory_scope",
+                    trigger: "select",
+                  },
+                  operation: () => setSelectedWorkspaceId(workspaceId),
+                  completed: { resultSource: "local_commit" },
+                  failureStage: "local_commit",
+                })
+              }
+            />
+          )}
         </div>
-      ) : !memoryEnabled ? null : (
-        <MemorySettingsViewer
-          catalogError={catalogError}
-          catalogState={catalogState}
-          selectedWorkspace={selectedWorkspace}
-          workspaces={displayWorkspaces}
-          onRefresh={handleRefresh}
-          onScopeKeyChange={(workspaceId) =>
-            runUserAction({
-              input: {
-                featureId: "settings.memory",
-                action: "change_memory_scope",
-                trigger: "select",
-              },
-              operation: () => setSelectedWorkspaceId(workspaceId),
-              completed: { resultSource: "local_commit" },
-              failureStage: "local_commit",
-            })
-          }
-        />
+      ) : (
+        <div className="space-y-6">
+          <SettingsGroupCard>
+            <SettingsRow
+              label={intl.formatMessage({
+                id: "settings.memory.global.switchTitle",
+              })}
+              description={intl.formatMessage({
+                id: "settings.memory.global.description",
+              })}
+              control={
+                <Switch
+                  aria-label={intl.formatMessage({
+                    id: "settings.memory.global.switchTitle",
+                  })}
+                  checked={globalMemoryEnabled}
+                  data-testid={TID_SETTINGS_MEMORY_GLOBAL_SWITCH}
+                  onCheckedChange={(checked) => {
+                    void onGlobalMemoryEnabledChange(checked);
+                  }}
+                />
+              }
+            />
+          </SettingsGroupCard>
+
+          <SettingsGroupCard>
+            <GlobalMemoryEditor
+              memoryService={memoryService}
+              disabled={!globalMemoryEnabled}
+            />
+          </SettingsGroupCard>
+        </div>
       )}
     </div>
   );

@@ -323,6 +323,8 @@ export interface AppSettings {
   nativeSearchEnhancementsEnabled?: boolean;
   /** 新建或冷恢复 Session 是否启用 Memory；默认关闭。 */
   memoryEnabled?: boolean;
+  /** 是否启用全局（跨工作区）记忆，总开关；默认关闭。开启后才注入上下文并允许在 UI/主 agent 编辑。 */
+  globalMemoryEnabled?: boolean;
   onboardingOccupation?:
     | "office"
     | "developer"

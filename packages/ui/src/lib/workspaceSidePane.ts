@@ -33,6 +33,16 @@ export interface GitSidePaneTab {
   openedAt?: number;
 }
 
+// 文件树 tab 是 workspace-global 单例。渲染目标（path/identity/remoteSessionId）由
+// AnimatedSidePanePanel 经 useWorkspaceRuntime 派生，不在 tab 上冗余存储。
+export interface FileTreeSidePaneTab {
+  id: "file-tree";
+  type: "file-tree";
+  ownerTaskId?: string | null;
+  workspaceKey?: string | null;
+  openedAt?: number;
+}
+
 export interface CodeViewerSidePaneTab {
   id: string;
   type: "code-viewer";
@@ -517,6 +527,7 @@ export type WorkspaceSidePaneTab =
   | BackgroundBashSidePaneTab
   | BrowserSidePaneTab
   | GitSidePaneTab
+  | FileTreeSidePaneTab
   | CodeViewerSidePaneTab
   | TreemappingSidePaneTab
   | WhiteboardSidePaneTab
@@ -648,6 +659,10 @@ function createBrowserSidePaneTab(options?: {
 
 function createGitSidePaneTab(): GitSidePaneTab {
   return { id: "git", type: "git", openedAt: Date.now() };
+}
+
+function createFileTreeSidePaneTab(): FileTreeSidePaneTab {
+  return { id: "file-tree", type: "file-tree", openedAt: Date.now() };
 }
 
 function createModelTrajectorySidePaneTab(options: {
@@ -1053,6 +1068,7 @@ export function sidePaneOwnerKey(taskId: string | null | undefined): string {
 
 const WORKSPACE_GLOBAL_SIDE_PANE_TAB_TYPES = new Set<WorkspaceSidePaneTab["type"]>([
   "git",
+  "file-tree",
   "developer-tools",
   "treemapping",
 ]);
@@ -1558,6 +1574,12 @@ export function activateGitSidePane(
   current: WorkspaceSidePaneState | null,
 ): WorkspaceSidePaneState {
   return activateSidePaneTab(current, createGitSidePaneTab());
+}
+
+export function activateFileTreeSidePane(
+  current: WorkspaceSidePaneState | null,
+): WorkspaceSidePaneState {
+  return activateSidePaneTab(current, createFileTreeSidePaneTab());
 }
 
 export function openWhiteboardSidePane(
@@ -2180,6 +2202,17 @@ export function toggleGitSidePane(
   }
 
   return activateGitSidePane(current);
+}
+
+export function toggleFileTreeSidePane(
+  current: WorkspaceSidePaneState | null,
+): WorkspaceSidePaneState | null {
+  const activeTab = getActiveSidePaneTab(current);
+  if (activeTab?.type === "file-tree") {
+    return closeSidePaneTab(current, activeTab.id);
+  }
+
+  return activateFileTreeSidePane(current);
 }
 
 export function closeCodeViewerSidePane(

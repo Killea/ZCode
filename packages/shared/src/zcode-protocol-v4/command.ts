@@ -97,6 +97,9 @@ export const commandPayloadSchemas = {
       modelSelection: modelSelectionSchema.optional(),
       mode: submissionModeSchema.optional(),
       planEnabled: z.boolean().optional(),
+      // 逐条 opt-in：本次用户消息是否携带全局（跨工作区）记忆。默认缺省（不携带），
+      // 即使全局记忆总开关开启，也只有显式为 true 的那一轮才注入。仅当前 Turn 生效。
+      includeGlobalMemory: z.boolean().optional(),
       // 本次执行仍使用上面的标准 Selection；这里只携带不持久化语义、动态鉴权和 child 策略。
       // 仅 idle startNow 接受，防止 Secret/Ticket 进入普通 CommandInbox。
       modelExecution: modelExecutionSchema.optional(),

@@ -55,8 +55,10 @@ export function WorkspaceHeader({
   isSidebarVisible,
   isTerminalOpen,
   isSidePaneOpen,
+  isFilesPaneOpen,
   onRefreshGit,
   onToggleTerminal,
+  onToggleFiles,
   onToggleSidePane,
   toggleSidePaneShortcutLabel,
   onReloadSession,
@@ -99,9 +101,11 @@ export function WorkspaceHeader({
   isSidebarVisible: boolean;
   isTerminalOpen: boolean;
   isSidePaneOpen: boolean;
+  isFilesPaneOpen: boolean;
   onRefreshGit: () => void;
   onToggleTerminal: () => void;
   onToggleBrowser: () => void;
+  onToggleFiles: () => void;
   onToggleSidePane: () => void;
   toggleSidePaneShortcutLabel?: string;
   onReloadSession: (options?: {
@@ -209,7 +213,9 @@ export function WorkspaceHeader({
           isDesktop={isDesktop}
           isTerminalOpen={isTerminalOpen}
           isSidePaneOpen={isSidePaneOpen}
+          isFilesPaneOpen={isFilesPaneOpen}
           onToggleTerminal={onToggleTerminal}
+          onToggleFiles={onToggleFiles}
           onToggleSidePane={onToggleSidePane}
           toggleSidePaneShortcutLabel={toggleSidePaneShortcutLabel}
           simplifyForNarrowRemote={simplifyForNarrowRemote}

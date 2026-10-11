@@ -3,6 +3,7 @@ const MIN_PREVIEW_PANE_HEAVY_CONTENT_VISIBLE_INLINE_SIZE_PX = 96;
 export type OpenTabLauncherItemId =
   | "selection-side-conversation"
   | "review"
+  | "files"
   | "terminal"
   | "browser"
   | "developer-tools";
@@ -10,11 +11,13 @@ export type OpenTabLauncherItemId =
 export function resolveOpenTabLauncherItemIds({
   developerToolsEnabled,
   hasReviewTab,
+  hasFileTreeTab,
   canOpenSelectionSideConversation = false,
   supportsEmbeddedBrowser = true,
 }: {
   developerToolsEnabled: boolean;
   hasReviewTab: boolean;
+  hasFileTreeTab: boolean;
   canOpenSelectionSideConversation?: boolean;
   supportsEmbeddedBrowser?: boolean;
 }): OpenTabLauncherItemId[] {
@@ -26,6 +29,10 @@ export function resolveOpenTabLauncherItemIds({
 
   if (!hasReviewTab) {
     itemIds.push("review");
+  }
+
+  if (!hasFileTreeTab) {
+    itemIds.push("files");
   }
 
   itemIds.push("terminal");

@@ -48,6 +48,7 @@ import type {
   AttachmentRef,
   ConversationSnapshot,
   SessionConfigState,
+  UserInputRow,
 } from "@zcode/shared/zcode-protocol-v4";
 import {
   ArrowUpIcon,
@@ -152,6 +153,12 @@ import type { CodeViewerSource } from "@/lib/codeViewer.js";
 import { useConversationSelectionReferences } from "@/v4/composer/useConversationSelectionReferences.js";
 import { ConversationBackgroundWorkTrigger } from "@/v4/composer/ConversationBackgroundWorkTrigger.js";
 import { V4ComposerCuaEntry } from "@/v4/composer/V4ComposerCuaEntry.js";
+import { V4ComposerGlobalMemorySwitch } from "@/v4/composer/V4ComposerGlobalMemorySwitch.js";
+import {
+  V4ComposerRecentPromptsHint,
+  type ComposerRecentPromptItem,
+} from "@/v4/composer/V4ComposerRecentPromptsHint.js";
+import { splitUserInputEpilogue } from "./ConversationUserInputEpilogue.js";
 import {
   V4ComposerModeSwitch,
   V4ComposerModelControls,
@@ -187,6 +194,8 @@ export interface ConversationComposerSendOptions {
   /** 本次 busy input 的一次性投递覆盖，不改 session 偏好。 */
   requestedDelivery?: "startNow" | "queue" | "guide";
   sharedContextRefs?: Array<{ kind: "shared_context_import"; context_id: string }>;
+  /** 逐条 opt-in：本次消息是否携带全局（跨工作区）记忆；缺省/ false = 不携带。 */
+  includeGlobalMemory?: boolean;
 }
 
 export type ConversationComposerSendResult = "sent" | "blocked" | "confirmationRequired";
@@ -387,6 +396,11 @@ interface ConversationComposerProps {
   blockingRequestId?: string | null;
   disabled?: boolean;
   /**
+   * 全局（跨工作区）记忆总开关；开启后 composer 展示逐条 opt-in 的"全局记忆"开关，
+   * 默认关闭，发送一次后自动复位。关闭时该开关完全不显示。
+   */
+  globalMemoryEnabled?: boolean;
+  /**
    * 是否在新建任务 / 切换会话 / 挂载后自动把光标聚焦到输入框（默认开）。
    * 竖切多 pane 时由宿主传入 SessionPane.focused，仅焦点 pane 聚焦、后台 pane 不抢焦点。
    */
@@ -497,6 +511,7 @@ function ConversationComposerImpl({
   centered = false,
   blockingRequestId = null,
   disabled = false,
+  globalMemoryEnabled = false,
   autoFocusEnabled = true,
   workspacePath,
   workspaceIdentity,
@@ -549,6 +564,9 @@ function ConversationComposerImpl({
   const configPickerScopeKey = `${workspaceKey}\0${draftScopeId}`;
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
+  // 逐条 opt-in 的"全局记忆"开关：默认关闭，仅在总开关开启时显示；
+  // 发送成功后自动复位（见 submit 的 sent 分支），因此平时不会携带全局记忆。
+  const [globalMemoryOptIn, setGlobalMemoryOptIn] = useState(false);
   const [configPickerState, setConfigPickerState] = useState<{
     scopeKey: string;
     activePicker: V4ComposerConfigPicker | null;
@@ -1345,6 +1363,8 @@ function ConversationComposerImpl({
         const sendResult = await onSendText(promptText, {
           submission,
           telemetrySeed,
+          // 逐条 opt-in：仅开关打开的这一条消息携带全局记忆；发送后复位为默认关闭。
+          ...(globalMemoryOptIn ? { includeGlobalMemory: true } : {}),
           ...(requestedDelivery ? { requestedDelivery } : {}),
           ...(heldQueueDisposition ? { heldQueueDisposition } : {}),
           ...(expectedHeldQueueItemIds ? { expectedHeldQueueItemIds } : {}),
@@ -1396,6 +1416,9 @@ function ConversationComposerImpl({
           return;
         }
         setHeldQueueConfirmation(null);
+        // 发送成功：本次消息已按 opt-in 携带（或明确未携带）全局记忆，复位开关为默认关闭，
+        // 下一条消息不会再携带（除非用户再次打开）。blocked/confirmationRequired 走上方早退，不复位。
+        setGlobalMemoryOptIn(false);
         // 暂存内容只有在发送成功后才移交给 task；失败仍保留为可重试草稿。
         await attachmentsApi.adoptSentAttachments(submittedAttachmentIds);
         // Bug 原因：发送等待期间产生的新正文属于下一次 Submission，旧 ACK 不能清除。
@@ -1443,6 +1466,7 @@ function ConversationComposerImpl({
       conversationTelemetry,
       draftConfig,
       createSubmissionFromComposer,
+      globalMemoryOptIn,
       submissionReady,
       getCodeCommentContexts,
       telemetryDraftConfig,
@@ -2134,6 +2158,21 @@ function ConversationComposerImpl({
     ],
   );
 
+  // 最近 3 条真实用户 prompt（旧→新），供 composer 底部 peek 图标 hover 展示当前 session 在做什么。
+  // 仅取投影裁决为 realUser 的 userInput 行（排除 background/goal/mailbox 等系统上下文）。
+  const recentPromptItems = useMemo<ComposerRecentPromptItem[]>(() => {
+    const rows = snapshot?.rows?.window;
+    if (!rows || rows.length === 0) return [];
+    const realUserInputs = rows.filter(
+      (row): row is UserInputRow =>
+        row.kind === "userInput" && row.origin === "realUser",
+    );
+    return realUserInputs.slice(-3).map((row) => {
+      const { body } = splitUserInputEpilogue(row.text, row.epilogueStart);
+      return { key: row.entityId ?? `row-${row.rowId}`, text: body };
+    });
+  }, [snapshot?.rows?.window]);
+
   // 左下：模式选择 + CUA 入口 + 当前 session 后台任务入口。followupMode 由 app 设置页同步到 CLI，
   // 不在 composer 暴露局部开关；后台入口只消费同一 snapshot，不维护第二份任务状态。
   const leadingActionsNode = useMemo(
@@ -2149,6 +2188,16 @@ function ConversationComposerImpl({
           onConfigPickerOpenChange={handleConfigPickerOpenChange}
           onSwitchMode={onSwitchMode}
         />
+        {/* 全局记忆逐条 opt-in：仅总开关开启时显示；默认关闭，发送后自动复位。 */}
+        {globalMemoryEnabled ? (
+          <V4ComposerGlobalMemorySwitch
+            checked={globalMemoryOptIn}
+            onChange={setGlobalMemoryOptIn}
+            disabled={disabled}
+          />
+        ) : null}
+        {/* 最近 3 条用户 prompt 的 peek 图标：hover 即可回看当前 session 在做什么。 */}
+        <V4ComposerRecentPromptsHint items={recentPromptItems} />
         {/* 附件画廊重构曾整段覆盖 leadingActions，误删 CUA 常驻入口。
             入口自身继续负责平台、远程与设置可见性，不在 composer 重复判定。 */}
         <V4ComposerCuaEntry
@@ -2170,11 +2219,14 @@ function ConversationComposerImpl({
       canStop,
       disabled,
       draftConfig,
+      globalMemoryEnabled,
+      globalMemoryOptIn,
       handleConfigPickerOpenChange,
       backgroundWorkOpenTarget,
       onOpenRunningBackgroundWorks,
       onSwitchMode,
       provider,
+      recentPromptItems,
       remoteSessionId,
       runningSubagentCount,
       snapshot?.backgroundWorks,

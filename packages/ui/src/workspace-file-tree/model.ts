@@ -17,6 +17,8 @@ export interface WorkspaceFileTreeRow extends WorkspaceFileTreeNode {
   loading: boolean;
   error: Error | null;
   compactedPaths?: string[];
+  /** 新建草稿行标记：仅组件层注入，数据层不产生；渲染行内命名输入框。 */
+  editing?: "create";
 }
 
 export type WorkspaceFileGitStatus =

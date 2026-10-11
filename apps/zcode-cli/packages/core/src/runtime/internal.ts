@@ -92,6 +92,10 @@ export interface AgentRuntimeInternal
   latestContextBuildResult?: ContextBuildResult;
   memoryRoot?: string;
   memoryIndexContent?: string;
+  globalMemoryFile?: string;
+  globalMemoryContent?: string;
+  /** 仅当前 Turn 用户显式选择携带全局记忆时为 true；每轮开始重置，默认 false。 */
+  turnGlobalMemoryIncluded?: boolean;
   memoryExtractionScheduler?: ProjectMemoryExtractionScheduler;
   contextSourcePort?: ContextSourcePort;
   skillPort?: SkillPort;

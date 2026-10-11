@@ -20,6 +20,7 @@ import { buildSkillsSection } from "./sections/skills.js";
 import { buildRequestUserContextSection } from "./sections/request-user-context.js";
 import { buildCurrentDateSection } from "./sections/current-date.js";
 import { buildMemorySection } from "./sections/memory.js";
+import { buildGlobalMemorySection } from "./sections/global-memory.js";
 import { buildDesktopContextSection } from "./sections/desktop.js";
 import {
   buildContextManagementSection,
@@ -154,6 +155,17 @@ export class ContextBuilder {
         if (memorySection) {
           sections.push(memorySection);
         }
+      }
+
+      // Global memory（跨工作区，独立开关 + 逐条 opt-in）：总开关开启（globalMemoryFile 在场）
+      // 且本轮用户显式选择携带（globalMemoryIncluded）才注入；空内容也展示规则。
+      if (this.config.globalMemoryFile && this.config.globalMemoryIncluded) {
+        sections.push(
+          buildGlobalMemorySection({
+            filePath: this.config.globalMemoryFile,
+            content: this.config.globalMemoryContent ?? "",
+          }),
+        );
       }
       sections.push(buildEnvInfoSection(this.config.envInfo, this.config.model));
 

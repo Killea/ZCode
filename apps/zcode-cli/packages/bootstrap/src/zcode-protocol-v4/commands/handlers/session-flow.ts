@@ -261,6 +261,8 @@ async function sendText(
         : {}),
       attachmentRefs: payload.attachments,
       sharedContextRefs: payload.context_refs,
+      // 逐条 opt-in：仅用户本次显式携带时才进 intent，其余轮保持缺省（不注入全局记忆）。
+      includeGlobalMemory: payload.includeGlobalMemory,
     });
     started = await startPromptTurn(host, record, {
       content: payload.text,

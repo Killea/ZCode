@@ -67,7 +67,10 @@ export interface WorkspaceHeaderActionSectionProps {
   isDesktop?: boolean;
   isTerminalOpen: boolean;
   isSidePaneOpen: boolean;
+  /** Side Pane 展开且激活 tab 为 file-tree 时为 true，用于 Header 文件按钮的高亮态。 */
+  isFilesPaneOpen: boolean;
   onToggleTerminal: () => void;
+  onToggleFiles: () => void;
   onToggleSidePane: () => void;
   toggleSidePaneShortcutLabel?: string;
   onSelectedEditorChange?: (editor: EditorInfo | null) => void;

@@ -20,7 +20,7 @@ import {
   resolveRuntimeDynamicWorkflowToolsIncluded,
 } from "./tool-allowlist.js";
 import { isStaleBranchRuntimeTaskEvent } from "../methods/runtime-command-generation.js";
-import { resolveEnabledProjectMemoryRoot } from "./project-memory.js";
+import { resolveEnabledGlobalMemoryDir, resolveEnabledProjectMemoryRoot } from "./project-memory.js";
 
 const DEFAULT_SUBAGENT_BACKGROUND_BASH_MAX_MS = 3_600_000;
 const EMPTY_RUNTIME_HOOK_CONFIG = {
@@ -212,6 +212,7 @@ function createRuntimeToolExecutor(
     deliveryKind: runtime.config.deliveryKind,
     getMemoryRoot: () =>
       deps.memoryRoot ?? resolveEnabledProjectMemoryRoot(runtime.config, runtime.workspaceRoot),
+    getMemoryGlobalRoot: () => resolveEnabledGlobalMemoryDir(runtime.config),
     runtimeScope: runtime.config.taskType === "subagent_child" ? "subagent" : "main",
     permissionTimeoutMs: runtime.config.permissionTimeoutMs,
     sessionId: runtime.sessionId,

@@ -43,6 +43,7 @@ import {
   BROWSER_USE_OPERATION_INDICATOR_DURATION_MS,
   openCodeViewerSidePane,
   openCodeViewerSidePanes,
+  activateFileTreeSidePane,
   activateGitSidePane,
   getActiveSidePaneTab,
   getVisibleSidePaneTabs,
@@ -54,6 +55,7 @@ import {
   setActiveSidePaneTab,
   syncSubagentSessionSidePaneTabs,
   toggleBrowserSidePane,
+  toggleFileTreeSidePane,
   toggleGitSidePane,
   updateBrowserSidePaneTab,
   stampSidePaneTabsOwnership,
@@ -724,6 +726,42 @@ export function useAppPanels(options: {
     syncSidePaneCollapsedWithTabs,
     workspaceAbsPath,
   ]);
+
+  const handleToggleFileTree = useCallback(() => {
+    commitOpenedSidePaneState((current) => {
+      if (isOfficeMode && !current?.tabs.some((tab) => tab.type === "file-tree")) return current;
+      const closingActiveFileTree = getActiveSidePaneTab(current)?.type === "file-tree";
+      const next = toggleFileTreeSidePane(current);
+      if (closingActiveFileTree) {
+        syncSidePaneCollapsedWithTabs(next);
+      } else {
+        revealSidePaneForCurrentOwner();
+      }
+      const activeTab = getActiveSidePaneTab(next);
+      logger.info(
+        `[App] 切换右侧面板 mode=${activeTab?.type ?? "none"} workspace=${workspaceAbsPath} tabs=${next?.tabs.length ?? 0}`,
+      );
+      return next;
+    });
+  }, [
+    isOfficeMode,
+    commitOpenedSidePaneState,
+    revealSidePaneForCurrentOwner,
+    syncSidePaneCollapsedWithTabs,
+    workspaceAbsPath,
+  ]);
+
+  const handleOpenFileTree = useCallback(() => {
+    commitOpenedSidePaneState((current) => {
+      if (isOfficeMode && !current?.tabs.some((tab) => tab.type === "file-tree")) return current;
+      const next = activateFileTreeSidePane(current);
+      revealSidePaneForCurrentOwner();
+      logger.info(
+        `[App] 打开右侧面板 mode=file-tree workspace=${workspaceAbsPath} tabs=${next.tabs.length}`,
+      );
+      return next;
+    });
+  }, [isOfficeMode, commitOpenedSidePaneState, revealSidePaneForCurrentOwner, workspaceAbsPath]);
 
   const handleOpenGit = useCallback(() => {
     commitOpenedSidePaneState((current) => {
@@ -1506,7 +1544,13 @@ export function useAppPanels(options: {
   const handleReopenClosedSidePaneTab = useCallback(
     (tabId: string) => {
       const item = allRecentClosedSidePaneTabs.find((entry) => entry.tab.id === tabId);
-      if (!item || (isOfficeMode && (item.tab.type === "terminal" || item.tab.type === "git")))
+      if (
+        !item ||
+        (isOfficeMode &&
+          (item.tab.type === "terminal" ||
+            item.tab.type === "git" ||
+            item.tab.type === "file-tree"))
+      )
         return;
 
       // 交互说明：最近关闭列表里的 tab 被点回打开时，需要同步展开右侧面板。
@@ -1560,7 +1604,10 @@ export function useAppPanels(options: {
       allRecentClosedSidePaneTabs.filter(
         (item) =>
           isSidePaneTabVisibleForParent(item.tab, activeTaskId) &&
-          (!isOfficeMode || (item.tab.type !== "terminal" && item.tab.type !== "git")),
+          (!isOfficeMode ||
+            (item.tab.type !== "terminal" &&
+              item.tab.type !== "git" &&
+              item.tab.type !== "file-tree")),
       ),
     [activeTaskId, allRecentClosedSidePaneTabs, isOfficeMode],
   );
@@ -1584,6 +1631,8 @@ export function useAppPanels(options: {
     handleOpenBrowserTab,
     handleToggleGit,
     handleOpenGit,
+    handleToggleFileTree,
+    handleOpenFileTree,
     handleOpenTreemapping,
     handleOpenWhiteboard,
     handleOpenDeveloperTools,

@@ -1,0 +1,19 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  // test 文件不属于 packages/ui 的 tsc -b 工程（其 include 只覆盖 src/，
+  // rootDir/outDir 也按 src 布局设置）。这里的独立 config 只服务编辑器与
+  // 单文件 typecheck：types 字段保持缺省，与 packages/ui 一样自动纳入全部
+  // @types；源码内部的 `@/` 别名需要与 packages/ui 一致的 paths 解析。
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "lib": ["es2025", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["../src/*"]
+    }
+  },
+  "include": ["*.ts", "../src/*.d.ts"]
+}

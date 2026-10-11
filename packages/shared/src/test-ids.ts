@@ -369,6 +369,12 @@ export const TID_RESOURCE_MANAGER_STORAGE_CONFIRM_CANCEL =
   "resource-manager-storage-confirm-cancel";
 /** Memory 设置模块中的总开关 */
 export const TID_SETTINGS_MEMORY_SWITCH = "settings-memory-switch";
+/** 全局记忆 Tab 的总开关 */
+export const TID_SETTINGS_MEMORY_GLOBAL_SWITCH = "settings-memory-global-switch";
+/** 全局记忆编辑框 */
+export const TID_SETTINGS_MEMORY_GLOBAL_EDITOR = "settings-memory-global-editor";
+/** 全局记忆保存按钮 */
+export const TID_SETTINGS_MEMORY_GLOBAL_SAVE = "settings-memory-global-save";
 /** Memory 设置模块刷新按钮 */
 export const TID_SETTINGS_MEMORY_REFRESH = "settings-memory-refresh";
 /** Memory Workspace Scope 菜单触发器 */
@@ -502,6 +508,8 @@ export const TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER = "workspace-help-menu-res
 export const TID_WORKSPACE_FILE_TREE_BUTTON = "workspace-file-tree-button";
 /** 工作区文件树面板 */
 export const TID_WORKSPACE_FILE_TREE_PANEL = "workspace-file-tree-panel";
+/** Header 文件树 Side Pane 显隐切换按钮 */
+export const TID_WORKSPACE_FILES_TOGGLE = "workspace-files-toggle";
 /** 工作区文件树刷新按钮 */
 export const TID_WORKSPACE_FILE_TREE_REFRESH_BUTTON = "workspace-file-tree-refresh-button";
 /** 工作区文件树条目（动态后缀为文件绝对路径） */

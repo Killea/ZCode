@@ -17,6 +17,7 @@ import type {
   WorkspaceFileGitStatusLabels,
   WorkspaceFileTreeContextMenuLabels,
   WorkspaceFileTreeEditorState,
+  WorkspaceFileTreeFileOps,
 } from "@/workspace-file-tree/types.js";
 
 export const WORKSPACE_FILE_TREE_MASK_OFFSET_PROPERTY = "--workspace-file-tree-mask-offset";
@@ -65,6 +66,7 @@ export function WorkspaceFileTreeList({
   gitStatusLabelByStatus,
   contextMenuLabels,
   editorState,
+  fileOps,
   onSelect,
   onToggleDirectory,
   onOpenPreview,
@@ -88,6 +90,7 @@ export function WorkspaceFileTreeList({
   gitStatusLabelByStatus: WorkspaceFileGitStatusLabels;
   contextMenuLabels: WorkspaceFileTreeContextMenuLabels;
   editorState: WorkspaceFileTreeEditorState;
+  fileOps: WorkspaceFileTreeFileOps;
   onSelect: (path: string) => void;
   onToggleDirectory: (row: WorkspaceFileTreeRow) => void;
   onOpenPreview: (row: WorkspaceFileTreeRow) => void;
@@ -141,6 +144,7 @@ export function WorkspaceFileTreeList({
       onOpenPreview={onOpenPreview}
       onOpenBrowserUrl={onOpenBrowserUrl}
       onKeyDown={onKeyDown}
+      {...fileOps}
     />
   );
   const listStyle: CSSProperties & Record<typeof WORKSPACE_FILE_TREE_MASK_OFFSET_PROPERTY, string> =

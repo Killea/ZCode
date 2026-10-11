@@ -248,6 +248,7 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
   isSidebarVisible,
   isSidePaneOpen,
   isBrowserOpen,
+  isFileTreeOpen,
   supportsEmbeddedBrowser,
   summaryPanelVariantOverride,
   onSummaryPanelVariantOverrideChange,
@@ -304,6 +305,8 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
   handleOpenDeveloperTools,
   handleOpenTerminalTab,
   handleToggleGit,
+  handleToggleFileTree,
+  handleOpenFileTree,
   handleOpenGitReview,
   handleToggleSidePane,
   handleOpenBrowserUrl,
@@ -1464,6 +1467,8 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
       onOpenDeveloperTools={handleOpenDeveloperTools}
       onOpenTerminalTab={handleOpenTerminalTab}
       onOpenReviewTab={handleToggleGit}
+      onOpenFilesTab={handleOpenFileTree}
+      projectName={projectName}
       onOpenSelectionSideConversation={handleOpenSelectionSideConversationLauncher}
       onRevealGitFileInTree={handleRevealGitFileInTree}
       onOpenBrowserUrl={handleOpenBrowserUrl}
@@ -1729,8 +1734,10 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
                           isSidebarVisible={isSidebarVisible}
                           isTerminalOpen={isTerminalOpen}
                           isSidePaneOpen={isSidePaneOpen}
+                          isFilesPaneOpen={isSidePaneOpen && isFileTreeOpen}
                           onRefreshGit={handleRefreshGit}
                           onToggleTerminal={handleToggleTerminal}
+                          onToggleFiles={handleToggleFileTree}
                           onToggleBrowser={handleToggleBrowser}
                           onToggleSidePane={handleToggleSidePane}
                           toggleSidePaneShortcutLabel={toggleSidePaneShortcutLabel}

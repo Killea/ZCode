@@ -17,11 +17,15 @@ import type {
 import type { AgentRuntimeInternal } from "../internal.js";
 import { ensureMemoryDirectoryExists } from "../../memory/directory.js";
 import { formatProjectMemoryIndexContent } from "../../memory/index-content.js";
+import { formatGlobalMemoryContent } from "../../memory/global-content.js";
 import {
   createReadFileStateKey,
   normalizeReadFileStateMtimeMs,
 } from "../../tool/read-file-state.js";
-import { resolveEnabledProjectMemoryRoot } from "../helpers/project-memory.js";
+import {
+  resolveEnabledGlobalMemoryFile,
+  resolveEnabledProjectMemoryRoot,
+} from "../helpers/project-memory.js";
 import { buildContextHistoryEntries } from "./context-history-entries.js";
 import { resolveRuntimeEmbeddedSearchEnabled } from "./embedded-search-branch.js";
 import { getContextSourceShellDisplayName } from "./session-shell-environment.js";
@@ -65,8 +69,12 @@ export async function ensureContextInitialized(
   this.skillLoadOutcome = await this.discoverSkillsForContext(traceContext);
   this.memoryRoot = await this.loadProjectMemoryRoot(traceContext);
   this.memoryIndexContent = await loadProjectMemoryIndexContent(this, this.memoryRoot);
+  this.globalMemoryFile = resolveEnabledGlobalMemoryFile(this.config);
+  this.globalMemoryContent = await loadGlobalMemoryContent(this, this.globalMemoryFile);
   this.contextBuilder = this.createContextBuilderFromSnapshot(snapshot, this.memoryRoot, {
     memoryIndexContent: this.memoryIndexContent,
+    globalMemoryFile: this.globalMemoryFile,
+    globalMemoryContent: this.globalMemoryContent,
     model,
   });
   this.initializeMessageHistoryFromContext(this.contextBuilder, traceContext);
@@ -97,7 +105,13 @@ export function createContextBuilderFromSnapshot(
   this: AgentRuntimeInternal,
   snapshot: ContextSourceSnapshot,
   memoryRoot?: string,
-  options: { memoryIndexContent?: string; model?: Model; persistEnvInfo?: boolean } = {},
+  options: {
+    memoryIndexContent?: string;
+    globalMemoryFile?: string;
+    globalMemoryContent?: string;
+    model?: Model;
+    persistEnvInfo?: boolean;
+  } = {},
 ): ContextBuilder {
   const envInfo = snapshot.envInfo;
   // 同步 preview / config-only fallback 会构造 unknown envInfo。
@@ -129,6 +143,11 @@ export function createContextBuilderFromSnapshot(
     projectContext: snapshot.projectContext,
     memoryIndexContent: options.memoryIndexContent,
     memoryRoot,
+    globalMemoryFile: options.globalMemoryFile,
+    globalMemoryContent: options.globalMemoryContent,
+    // 全局记忆改为逐条 opt-in：读当前 Turn 的 runtime 事实（每轮开始重置），
+    // 首轮 ensureContextInitialized 与后续 rebuildContextPrefix 都会经这里读取。
+    globalMemoryIncluded: this.turnGlobalMemoryIncluded === true,
     skills: this.skillLoadOutcome,
     agentProfiles: this.config.subagents?.profiles,
     embeddedSearchEnabled: resolveRuntimeEmbeddedSearchEnabled(this),
@@ -190,6 +209,22 @@ async function loadProjectMemoryIndexContent(
     return read.content;
   } catch {
     // 默认 Memory 分支将缺失或不可读的 index 视为没有该 context source。
+    return undefined;
+  }
+}
+
+/** 读取并格式化全局（跨工作区）记忆内容；缺失或不可读时返回 undefined。 */
+async function loadGlobalMemoryContent(
+  runtime: AgentRuntimeInternal,
+  file: string | undefined,
+): Promise<string | undefined> {
+  const fileSystemPort = runtime.fileSystemPort;
+  if (!fileSystemPort || !file) return undefined;
+  try {
+    const read = await fileSystemPort.readTextFile({ path: file });
+    return formatGlobalMemoryContent(read.content) || undefined;
+  } catch {
+    // 全局记忆缺失或不可读时视为未启用（与项目记忆 index 的处理一致）。
     return undefined;
   }
 }

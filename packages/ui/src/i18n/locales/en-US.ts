@@ -715,6 +715,8 @@ const enUS: Record<string, string> = {
   "sidePane.openFile.category": "Files",
   "sidePane.openFile.emptyQuery": "Type to search files",
   "sidePane.review": "Review",
+  "sidePane.files": "Files",
+  "files.toggle": "Toggle files",
   "whiteboard.title": "Whiteboard",
   "whiteboard.defaultName": "Whiteboard",
   "whiteboard.nameLabel": "Whiteboard name",
@@ -1366,6 +1368,16 @@ const enUS: Record<string, string> = {
   "workspaceFileTree.openInBrowser": "Open in built-in browser",
   "workspaceFileTree.openFailed": "Could not open this item",
   "workspaceFileTree.addToChat": "Add to chat",
+  "workspaceFileTree.newFile": "New file",
+  "workspaceFileTree.newFolder": "New folder",
+  "workspaceFileTree.rename": "Rename",
+  "workspaceFileTree.delete": "Delete",
+  "workspaceFileTree.deleteConfirmTitle": "Delete this item?",
+  "workspaceFileTree.deleteConfirmFile":
+    '"{name}" will be permanently deleted. This cannot be undone.',
+  "workspaceFileTree.deleteConfirmDirectory":
+    '"{name}" and all its contents will be permanently deleted. This cannot be undone.',
+  "workspaceFileTree.editingInvalidName": "Name cannot be empty or contain path separators.",
   "workspaceFileTree.gitStatus.ignored": "Ignored",
 
   // SSH dialog
@@ -1818,6 +1830,19 @@ const enUS: Record<string, string> = {
     "Use enhanced Find and Grep in new sessions and sessions restored after an app restart. Active sessions keep their current setting; Find remains unchanged on Windows.",
   "settings.memory": "Memory",
   "settings.memory.workspaceMemory": "Workspace Memory",
+  "settings.memory.tab.workspace": "Workspace Memory",
+  "settings.memory.tab.global": "Global Memory",
+  "settings.memory.global.switchTitle": "Global Memory",
+  "settings.memory.global.description":
+    "A single shared file across all workspaces (up to 2048 characters). Injected into the main agent's context; the agent edits it only when you ask.",
+  "settings.memory.global.editorLabel": "Global memory content",
+  "settings.memory.global.charCount": "{count} / {limit} characters",
+  "settings.memory.global.empty": "No global memory yet. Write shared context here.",
+  "settings.memory.global.save": "Save",
+  "settings.memory.global.saved": "Global memory saved.",
+  "settings.memory.global.saveFailed": "Failed to save global memory.",
+  "settings.memory.global.loadFailed": "Failed to load global memory.",
+  "settings.memory.global.unsaved": "Unsaved changes",
   "settings.memoryDescription":
     "Save and reuse long-term context in workspaces. Applies to new sessions and may increase model requests and token costs.",
   "settings.memory.viewer.disabled": "Enable Workspace Memory to view saved memories.",
@@ -4525,6 +4550,14 @@ const enUS: Record<string, string> = {
     "A conversation is running. Computer Use can't be toggled right now — try again after it finishes.",
   "chat.toolbar.mode.description":
     "Switch the task's permission and execution mode, such as default, plan, or accept edits.",
+  "chat.toolbar.globalMemory.label": "Global memory",
+  "chat.toolbar.globalMemory.labelOn": "Include global memory for this message",
+  "chat.toolbar.globalMemory.labelOff": "Omit global memory for this message",
+  "chat.toolbar.globalMemory.tooltipOn":
+    "This message includes global (cross-workspace) memory. It turns back off after sending.",
+  "chat.toolbar.globalMemory.tooltipOff":
+    "Global memory is not sent by default. Turn on to include it for this message only; it resets after sending.",
+  "chat.toolbar.recentPrompts.label": "Recent prompts",
   "chat.toolbar.thoughtLevel.label": "Reasoning effort",
   "chat.toolbar.thoughtLevel.tooltip": "Thought level",
   "chat.toolbar.thoughtLevel.placeholder": "Select reasoning level",

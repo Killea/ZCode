@@ -153,6 +153,7 @@ export interface WorkspaceShellLayoutProps extends Omit<AppProps, "baseFeedbackS
   isBrowserOpen: boolean;
   supportsEmbeddedBrowser: boolean;
   isGitOpen: boolean;
+  isFileTreeOpen: boolean;
   isSidePaneOpen: boolean;
   summaryPanelVariantOverride: ChatViewSummaryPanelVariant | null;
   onSummaryPanelVariantOverrideChange: (variant: ChatViewSummaryPanelVariant | null) => void;
@@ -239,6 +240,8 @@ export interface WorkspaceShellLayoutProps extends Omit<AppProps, "baseFeedbackS
   handleOpenDeveloperTools: () => void;
   handleOpenTerminalTab: () => void;
   handleToggleGit: () => void;
+  handleToggleFileTree: () => void;
+  handleOpenFileTree: () => void;
   handleOpenGitReview: (sourceId?: GitChangeSourceId) => void;
   handleToggleSidePane: () => void;
   handleOpenBrowserUrl: (url: string) => void;

@@ -1,11 +1,14 @@
 import {
+  GLOBAL_MEMORY_CHARACTER_LIMIT,
+  GLOBAL_MEMORY_CHARACTER_LIMIT_EXCEEDED_ERROR_CODE,
   type IMemoryService,
   type ProjectMemoryFileSummary,
   type ProjectMemoryWorkspaceSummary,
 } from "./memory.js";
-import { lstat, readdir, realpath } from "node:fs/promises";
+import { lstat, readFile, readdir, realpath, stat } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, sep } from "node:path";
 import { readProjectMemoryFileFromStableHandle } from "#src/memory/projectMemoryStableRead.js";
+import { atomicWriteText } from "#src/fs/atomicFileUtils.js";
 import { getZCodeDataRootDir } from "#src/paths.js";
 
 const PROJECT_MEMORY_INDEX_FILE_NAME = "MEMORY.md";
@@ -18,6 +21,11 @@ function isNotFoundError(error: unknown): boolean {
 
 function getProjectMemoriesRoot(): string {
   return join(getZCodeDataRootDir(), "cli", "memories", "projects");
+}
+
+/** 全局（跨工作区）记忆单文件：~/.zcode/cli/memories/global/MEMORY.md */
+function getGlobalMemoryFile(): string {
+  return join(getZCodeDataRootDir(), "cli", "memories", "global", "MEMORY.md");
 }
 
 function isValidPathSegment(value: string): boolean {
@@ -231,8 +239,45 @@ export function createMemoryService(): IMemoryService {
     });
   }
 
+  async function readGlobalMemoryFile(): Promise<{
+    content: string;
+    updatedAt: number | null;
+    exists: boolean;
+  }> {
+    const filePath = getGlobalMemoryFile();
+    try {
+      const content = await readFile(filePath, "utf-8");
+      const info = await stat(filePath);
+      return { content, updatedAt: info.mtimeMs, exists: true };
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return { content: "", updatedAt: null, exists: false };
+      }
+      throw error;
+    }
+  }
+
+  async function writeGlobalMemoryFile(params: {
+    content: string;
+  }): Promise<{ updatedAt: number }> {
+    if (params.content.length > GLOBAL_MEMORY_CHARACTER_LIMIT) {
+      throw Object.assign(
+        new Error(
+          `Global memory exceeds the ${GLOBAL_MEMORY_CHARACTER_LIMIT}-character limit: ${params.content.length} characters`,
+        ),
+        { code: GLOBAL_MEMORY_CHARACTER_LIMIT_EXCEEDED_ERROR_CODE },
+      );
+    }
+    const filePath = getGlobalMemoryFile();
+    await atomicWriteText(filePath, params.content);
+    const info = await stat(filePath);
+    return { updatedAt: info.mtimeMs };
+  }
+
   return {
     listProjectMemories,
     readProjectMemoryFile,
+    readGlobalMemoryFile,
+    writeGlobalMemoryFile,
   };
 }

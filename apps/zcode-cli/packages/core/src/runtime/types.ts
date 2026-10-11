@@ -299,6 +299,8 @@ export interface EnqueueSubagentMessageInput {
 export interface MemoryRuntimeConfig {
   cliStorageRoot?: string;
   enabled?: boolean;
+  /** 是否启用全局（跨工作区）记忆总开关；开启后才注入上下文并放行主 agent 写入。 */
+  globalEnabled?: boolean;
   /** 是否调度成功 Main turn 后的自动 Extraction；缺省按 true 处理。 */
   extractionEnabled?: boolean;
   storageRoot?: string;
