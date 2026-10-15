@@ -567,9 +567,16 @@ export default {
       // Local Network 归因落在发起连接的 Helper 进程身份上（如
       // com.github.Electron Helper）；extendInfo 只覆盖主 app plist，这里把
       // Frameworks 下全部 Helper 子包的 Info.plist 也补上声明，且必须在签名前完成。
+      // 注意：这里不能用 `context.packager.info.framework.distMacOsAppName`——那是
+      // Electron 框架的品牌名（未配置 electronBranding 时为 "Electron.app"），不是产品名，
+      // 会导致 appPath 指向不存在的目录，Helper 声明被静默跳过。与 resolveAppAsarPath 一致，
+      // 用 appInfo.productFilename 构造真实 app 目录名。
       await runTimedAsync("afterPack:declareMacLocalNetworkUsage", () =>
         patchMacBundleLocalNetworkUsage({
-          appPath: resolve(context.appOutDir, context.packager.info.framework.distMacOsAppName),
+          appPath: resolve(
+            context.appOutDir,
+            `${context.packager?.appInfo?.productFilename ?? "ZCode"}.app`,
+          ),
           description: macosLocalNetworkUsageDescription(desktopProductIdentity.productName),
         }),
       );

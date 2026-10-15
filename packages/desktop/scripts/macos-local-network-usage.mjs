@@ -46,10 +46,13 @@ export function injectPlistStringEntry(plist, key, value) {
 export async function patchMacBundleLocalNetworkUsage({ appPath, description }) {
   const frameworksDir = join(appPath, "Contents", "Frameworks");
   const candidates = [join(appPath, "Contents", "Info.plist")];
-  const frameworkEntries = await readdir(frameworksDir).catch(() => []);
+  // 调用方传错 appPath 时（如把 Electron 框架品牌名当产品名）Frameworks 目录不存在。
+  // 这里必须 fail loud：静默跳过会让 Local Network 声明缺失且构建仍成功，
+  // LAN 推理端点在用户机器上表现为 EHOSTUNREACH，事后极难排查。
+  const frameworkEntries = await readdir(frameworksDir, { withFileTypes: true });
   for (const entry of frameworkEntries) {
-    if (entry.endsWith(".app")) {
-      candidates.push(join(frameworksDir, entry, "Contents", "Info.plist"));
+    if (entry.isDirectory() && entry.name.endsWith(".app")) {
+      candidates.push(join(frameworksDir, entry.name, "Contents", "Info.plist"));
     }
   }
 

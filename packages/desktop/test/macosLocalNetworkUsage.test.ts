@@ -67,8 +67,20 @@ test("patchMacBundleLocalNetworkUsage covers main app and helper bundles", async
   });
   assert.equal(patched.length, 2);
   for (const plistPath of patched) {
-    const content = readFileSync(plistPath, "utf-8");
+    const content = readFileSync(plistPath, "utf8");
     assert.ok(content.includes(`<key>${MACOS_LOCAL_NETWORK_USAGE_KEY}</key>`));
     assert.ok(content.includes("<string>desc</string>"));
   }
+});
+
+test("patchMacBundleLocalNetworkUsage throws when Frameworks directory is missing", async () => {
+  // 传错 appPath（例如把 Electron 框架品牌名当产品名）时 Frameworks 目录不存在，
+  // 必须显式抛错而不是静默只处理主 app，否则 Helper 声明缺失且构建仍然成功。
+  const appPath = mkdtempSync(join(tmpdir(), "local-network-no-frameworks-"));
+  mkdirSync(join(appPath, "Contents"), { recursive: true });
+  writeFileSync(join(appPath, "Contents", "Info.plist"), MINIMAL_PLIST, "utf8");
+  await assert.rejects(
+    () => patchMacBundleLocalNetworkUsage({ appPath, description: "desc" }),
+    /Frameworks/,
+  );
 });
