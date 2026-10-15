@@ -1,7 +1,7 @@
-# ZCode
+# ZCodePlus
 
 <div align="center">
-  <img src="public/logo/icons/1024x1024.png" alt="ZCode" width="128" height="128" />
+  <img src="public/logo/icons/1024x1024.png" alt="ZCodePlus" width="128" height="128" />
 </div>
 <p align="center">
   <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=47ag983c-8fcb-4d6d-814b-5395193a712c&amp;qr_code=true">Feishu community</a> ·
@@ -11,7 +11,41 @@
   <a href="README.md">简体中文</a> | English
 </p>
 
-ZCode is an AI coding workspace with desktop, browser, and terminal interfaces. This repository contains the clients, backend services, shared UI, and Agent CLI and runtime source code.
+**ZCodePlus** is a community-enhanced fork of the [ZCode](https://zcode.z.ai) open-source project. ZCode is an AI coding workspace with desktop, browser, and terminal interfaces; ZCodePlus keeps the full official feature set (clients, backend services, shared UI, Agent CLI and runtime) and layers on a set of improvements aimed at **self-hosted / local inference models** and the macOS desktop experience.
+
+> Baseline: this repository is built on the official ZCode open-source code (commit `872ad96`, "feat: open source"). Everything on top of that baseline is listed in [Differences from official ZCode](#differences-from-official-zcode). Product and CLI names (ZCode / ZCode Preview / the `zcode` command) are unchanged; "ZCodePlus" refers to this project (repository).
+
+## Differences from official ZCode
+
+### Self-hosted / local model compatibility (main focus)
+
+- **Per-model stream idle timeout and capability projection** (`87314c8`): model-level `streamIdleTimeoutMs` (30 min default for local inference models) so slow local models are no longer cut off prematurely; WebSearch is filtered from subagent tool allowlists when the parent model lacks native web search, and Agent/Task tool descriptions are projected per model to avoid `invalid_model_request`; EPIPE-class errors are treated as recoverable.
+- **Automatic repair-retry on modality rejection** (`fa974fc`): self-hosted OpenAI-compatible endpoints often declare a modality they do not actually accept (e.g. `supportsPdf: true` while rejecting `file` content parts). On an explicit modality rejection, only the request-local message copy is rewritten — rejected media blocks are replaced with the same text placeholders used by capability projection — and the turn retries once (session history and declared capability config untouched; one repair per modality, capped in total). Covers both streaming and non-streaming paths.
+- **Recovery of tool calls emitted as text markup** (`e045115`): some self-hosted endpoints (e.g. qwen-family models on a self-hosted server) do not extract `<tool_call>` markup into structured `tool_calls`, so the markup arrives as plain assistant text and the turn ends looking frozen. When a model step finishes with no executable tool calls, complete `<tool_call>` blocks in the response text are now synthesized into executable tool calls and run through the normal execution/permission pipeline (max 8 per response; unknown names get a `ToolNotFound` result fed back so the model can correct itself).
+
+### Memory
+
+- **Per-turn opt-in global memory** (`da989be`): an independent `globalEnabled` toggle, separate from the per-project flag; global memory is injected only when the toggle is on and the user explicitly opts in for the current turn, and resets at turn start.
+
+### macOS desktop
+
+- **Local Network (NECP) permission declaration** (`5ca8ee5`): macOS's Local Network privacy policy drops private-network TCP SYNs from unauthorized processes at kernel level (`EHOSTUNREACH`), making LAN inference endpoints (`http://192.168.x.x:8080/v1`) unreachable. Both packaged and dev builds now declare `NSLocalNetworkUsageDescription` in the main app and every Helper sub-bundle (written before signing), so the system authorization prompt works. See [docs/macos-local-network-access.md](docs/macos-local-network-access.md).
+
+### Desktop experience
+
+- **Last-modified timestamp in the About dialog** (`c619f15`): shows the newer of build-metadata time and the running agent bundle's mtime, making local rebuilds identifiable.
+- **Quit confirmation gated on `app.isPackaged`** (`3149910`): all packaged builds (including Preview and local unpacked) confirm on quit; dev and E2E runs are not blocked.
+- **Abort reason in tool cancellation messages** (`bbcce5c`): a readable parent-abort reason (e.g. "Protocol runtime stopping") is surfaced, distinguishing manual stop from runtime shutdown.
+
+### UI and design
+
+- **All rounded corners removed** (`110ea02`): every container, control, dialog, menu, and overlay has zero border-radius; DESIGN.md now specifies a square interface with only deliberate circles/pills as exceptions; running-session count reporting consolidated.
+- **Gold application icon**: desktop app icons (macOS `.icns` / Windows `.ico` / Linux PNG) and web icons switched to the gold Z wordmark.
+
+### Engineering and docs
+
+- **Local build & runtime workflow documentation** (`f92ecd8`): desktop local shortcuts, CLI dist symlink fast rebuild, AppImage repack caveats.
+- **Extended typecheck coverage** (`eba56be`, `52258c0`): core and adapters package test files added to typecheck.
 
 | Interface                    | Purpose                                                                                   | Development command            |
 | ---------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------ |

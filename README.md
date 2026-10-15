@@ -1,7 +1,7 @@
-# ZCode
+# ZCodePlus
 
 <div align="center">
-  <img src="public/logo/icons/1024x1024.png" alt="ZCode" width="128" height="128" />
+  <img src="public/logo/icons/1024x1024.png" alt="ZCodePlus" width="128" height="128" />
 </div>
 <p align="center">
   <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=47ag983c-8fcb-4d6d-814b-5395193a712c&amp;qr_code=true">飞书社群</a> ·
@@ -11,7 +11,41 @@
   简体中文 | <a href="README.en.md">English</a>
 </p>
 
-ZCode 是 AI 编程工作台，提供桌面应用、浏览器界面和终端 Agent。本仓库包含客户端、后端服务、共享 UI，以及 Agent CLI 与运行时源码。
+**ZCodePlus** 是 [ZCode](https://zcode.z.ai) 开源项目的社区增强版。ZCode 是 AI 编程工作台，提供桌面应用、浏览器界面和终端 Agent；ZCodePlus 在保留官方完整功能（客户端、后端服务、共享 UI、Agent CLI 与运行时源码）的基础上，叠加了一批面向**自托管 / 本地推理模型**场景与 macOS 桌面体验的改进。
+
+> 基线说明：本仓库基于官方 ZCode 开源代码（commit `872ad96`，"feat: open source"）构建，其上全部改动见下文「[与官方 ZCode 的区别](#与官方-zcode-的区别)」。应用与 CLI 的产品名（ZCode / ZCode Preview / `zcode` 命令）保持不变，ZCodePlus 仅指本仓库这一工程。
+
+## 与官方 ZCode 的区别
+
+### 自托管 / 本地模型兼容性（重点）
+
+- **模型级流式超时与能力投影**（`87314c8`）：新增模型级 `streamIdleTimeoutMs` 配置，本地推理模型默认 30 分钟流空闲超时，慢速本地模型不再被过早掐断；父模型不支持原生 Web 搜索时，自动从子代理工具白名单中过滤 WebSearch，并按模型投影 Agent/Task 工具描述，避免 `invalid_model_request`；EPIPE 等错误按可恢复处理。
+- **模态拒绝自动修复重试**（`fa974fc`）：自托管 openai-compatible 端点常声明支持某模态却实际拒绝（如 `supportsPdf: true` 但服务端拒绝 `file` content part）。现在在收到显式模态拒绝时，只改写请求侧消息副本、把被拒媒体块替换为文本占位符并重试一次（不改会话历史与用户能力配置；每种模态至多修复一次，总次数封顶），流式与非流式两条路径都覆盖。
+- **文本标记工具调用恢复**（`e045115`）：部分自托管端点（如运行 qwen 系模型的自建服务）不会把 `<tool_call>` 文本标记抽取成结构化 `tool_calls`，标记以普通助手文本到达、回合直接结束，推理看起来"冻结"。现在模型步骤结束时若无可执行工具调用，会扫描响应文本中的完整 `<tool_call>` 块并合成可执行工具调用，走正常执行/权限/校验流水线（每次响应上限 8 个；未知工具名回灌 `ToolNotFound` 让模型自我纠正）。
+
+### 记忆系统
+
+- **按回合可选的全局记忆**（`da989be`）：记忆配置新增独立的 `globalEnabled` 开关，与按项目 `enabled` 分离；全局记忆仅在开关开启且用户当前回合显式选择时才注入上下文，回合开始时复位，默认不注入。
+
+### macOS 桌面支持
+
+- **Local Network（NECP）权限声明**（`5ca8ee5`）：macOS 本地网络隐私策略会在内核层丢弃未授权进程发往私网地址的 TCP SYN（表现为 `EHOSTUNREACH`），导致局域网推理端点（如 `http://192.168.x.x:8080/v1`）无法连接。打包态与开发态现在都在主 app 与全部 Helper 子 bundle 的 `Info.plist` 声明 `NSLocalNetworkUsageDescription`（签名前写入），系统授权框可正常弹出。详见 [docs/macos-local-network-access.md](docs/macos-local-network-access.md)。
+
+### 桌面体验
+
+- **关于对话框显示"最后修改"时间**（`c619f15`）：取构建元数据时间与运行时 agent bundle 实际 mtime 的较新值，方便确认本地跑的是哪一次构建。
+- **退出确认按打包态门控**（`3149910`）：改用 `app.isPackaged` 判断——所有打包产物（含 Preview 与本地 unpacked）启用退出确认，开发态与 E2E 不被拦截。
+- **工具取消消息展示中止原因**（`bbcce5c`）：父级 abort 携带的可读原因（如 "Protocol runtime stopping"）会附加到取消消息，用户可区分手动停止与运行时关闭。
+
+### UI 与设计
+
+- **全面去圆角**（`110ea02`）：所有容器、控件、对话框、菜单与浮层 border-radius 归零，设计规范（DESIGN.md）同步改为方形界面，仅保留有意为之的圆形/胶囊例外；合并了运行中会话计数的上报逻辑。
+- **金黄色应用图标**：桌面应用图标（macOS `.icns` / Windows `.ico` / Linux PNG）与 Web 图标统一更换为金黄 Z 字标。
+
+### 工程与文档
+
+- **本机构建与运行工作流文档**（`f92ecd8`）：桌面本地快捷方式、CLI dist 符号链接快速重编、AppImage 重打包注意事项等。
+- **typecheck 覆盖扩展**（`eba56be`、`52258c0`）：core 与 adapters 包的测试文件纳入 typecheck。
 
 | 入口                 | 用途                                                           | 开发命令                       |
 | -------------------- | -------------------------------------------------------------- | ------------------------------ |
