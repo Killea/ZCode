@@ -1,5 +1,11 @@
 import { access, cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import {
+  injectPlistStringEntry,
+  MACOS_LOCAL_NETWORK_USAGE_KEY,
+  macosLocalNetworkUsageDescription,
+  patchMacBundleLocalNetworkUsage,
+} from "./macos-local-network-usage.mjs";
 
 export const DEV_ELECTRON_PROTOCOL_SCHEME = "zcode";
 export const DEV_ELECTRON_APP_NAME = "ZCode Dev";
@@ -45,7 +51,14 @@ export function patchDevElectronInfoPlist(plist) {
   let patched = replacePlistString(plist, "CFBundleDisplayName", DEV_ELECTRON_APP_NAME);
   patched = replacePlistString(patched, "CFBundleIdentifier", DEV_ELECTRON_APP_BUNDLE_ID);
   patched = replacePlistString(patched, "CFBundleName", DEV_ELECTRON_APP_NAME);
-  return appendProtocolDeclaration(patched);
+  patched = appendProtocolDeclaration(patched);
+  // Dev 副本同样要声明 Local Network usage：不声明则 dev 跑的 agent 连
+  // 局域网模型服务时会被 NECP 丢弃（EHOSTUNREACH），且系统不会弹授权框。
+  return injectPlistStringEntry(
+    patched,
+    MACOS_LOCAL_NETWORK_USAGE_KEY,
+    macosLocalNetworkUsageDescription(DEV_ELECTRON_APP_NAME),
+  );
 }
 
 export function resolveDevElectronAppBundlePath({ runtimeRoot, electronVersion, arch }) {
@@ -89,6 +102,7 @@ export async function prepareDevElectronAppBundle({
     needsCopy =
       !existingInfoPlist.includes(`<string>${DEV_ELECTRON_APP_BUNDLE_ID}</string>`) ||
       !existingInfoPlist.includes(`<string>${DEV_ELECTRON_PROTOCOL_SCHEME}</string>`) ||
+      !existingInfoPlist.includes(`<key>${MACOS_LOCAL_NETWORK_USAGE_KEY}</key>`) ||
       sourceStamp === undefined ||
       existingStamp !== sourceStamp;
   } catch {
@@ -108,6 +122,12 @@ export async function prepareDevElectronAppBundle({
     await cp(electronAppPath, appPath, { recursive: true, verbatimSymlinks: true });
     const patchedInfoPlist = patchDevElectronInfoPlist(await readFile(infoPlistPath, "utf8"));
     await writeFile(infoPlistPath, patchedInfoPlist, "utf8");
+    // raw Electron 的 Helper 子 bundle 仍带 com.github.Electron 身份；dev 下发起
+    // LAN 连接的进程归因在这些 Helper 上，同样要补 usage description。
+    await patchMacBundleLocalNetworkUsage({
+      appPath,
+      description: macosLocalNetworkUsageDescription(DEV_ELECTRON_APP_NAME),
+    });
     // 指纹最后写：中途失败时下次仍会判定为需要重拷，不会留下半成品缓存。
     if (sourceStamp !== undefined) await writeFile(sourceStampPath, sourceStamp, "utf8");
   }
