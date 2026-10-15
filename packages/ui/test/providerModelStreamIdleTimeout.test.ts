@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { describe, expect, it } from "vitest";
 import { manualModelConfigSchema } from "@zcode/provider";
 import { modelPropertiesDataSchema } from "@zcode/shared/model-config";
 import type { ProviderSettingsFormModel } from "../src/lib/providerSettingsFormTypes.js";
@@ -73,63 +72,75 @@ function createDraftFixture(
   };
 }
 
-test("streamIdleTimeoutMs is accepted by the sparse and manual model config schemas", () => {
-  assert.equal(
-    modelPropertiesDataSchema.parse({ streamIdleTimeoutMs: 1_800_000 }).streamIdleTimeoutMs,
-    1_800_000,
-  );
-  // manualModelConfigSchema 校验的是物化后的完整手动配置，所有可编辑叶子都必须在场。
-  const manual = manualModelConfigSchema.parse({
-    properties: {
-      contextWindow: 200_000,
-      supportsJsonSchemaOutput: false,
-      supportsNativeWebSearch: false,
-      supportsMidConversationSystem: false,
-      streamIdleTimeoutMs: 120_000,
-      inputFormat: { supportsImage: false, supportsVideo: false, supportsPdf: false },
-    },
-    optionSpecs: {
-      reasoningLevel: { values: ["disabled", "enabled"], map: "{}" },
-      maxOutputTokens: { max: 32_000 },
-    },
+describe("providerModelStreamIdleTimeout", () => {
+  it("streamIdleTimeoutMs is accepted by the sparse and manual model config schemas", () => {
+    expect(
+      modelPropertiesDataSchema.parse({ streamIdleTimeoutMs: 1_800_000 })
+        .streamIdleTimeoutMs,
+    ).toBe(1_800_000);
+    // manualModelConfigSchema 校验的是物化后的完整手动配置，所有可编辑叶子都必须在场。
+    const manual = manualModelConfigSchema.parse({
+      properties: {
+        contextWindow: 200_000,
+        supportsJsonSchemaOutput: false,
+        supportsNativeWebSearch: false,
+        supportsMidConversationSystem: false,
+        streamIdleTimeoutMs: 120_000,
+        inputFormat: {
+          supportsImage: false,
+          supportsVideo: false,
+          supportsPdf: false,
+        },
+      },
+      optionSpecs: {
+        reasoningLevel: { values: ["disabled", "enabled"], map: "{}" },
+        maxOutputTokens: { max: 32_000 },
+      },
+    });
+    expect(manual.properties?.streamIdleTimeoutMs).toBe(120_000);
   });
-  assert.equal(manual.properties?.streamIdleTimeoutMs, 120_000);
-});
 
-test("draft roundtrip renders a personal timeout override in seconds", () => {
-  const model = createModelFixture({
-    personalConfig: { properties: { streamIdleTimeoutMs: 1_800_000 } },
+  it("draft roundtrip renders a personal timeout override in seconds", () => {
+    const model = createModelFixture({
+      personalConfig: { properties: { streamIdleTimeoutMs: 1_800_000 } },
+    });
+    expect(createProviderModelDraftValues(model).streamIdleTimeoutValue).toBe(
+      "1800",
+    );
   });
-  assert.equal(createProviderModelDraftValues(model).streamIdleTimeoutValue, "1800");
-});
 
-test("commit stores seconds as streamIdleTimeoutMs milliseconds in the personal overlay", () => {
-  const result = resolveProviderModelDraftCommit({
-    currentModel: createModelFixture(),
-    draft: createDraftFixture({ streamIdleTimeoutValue: "1800" }),
+  it("commit stores seconds as streamIdleTimeoutMs milliseconds in the personal overlay", () => {
+    const result = resolveProviderModelDraftCommit({
+      currentModel: createModelFixture(),
+      draft: createDraftFixture({ streamIdleTimeoutValue: "1800" }),
+    });
+    expect(result.status).toBe("commit");
+    if (result.status !== "commit") return;
+    expect(result.model.config.properties?.streamIdleTimeoutMs).toBe(1_800_000);
+    expect(result.model.personalConfig.properties?.streamIdleTimeoutMs).toBe(
+      1_800_000,
+    );
   });
-  assert.equal(result.status, "commit");
-  if (result.status !== "commit") return;
-  assert.equal(result.model.config.properties?.streamIdleTimeoutMs, 1_800_000);
-  assert.equal(result.model.personalConfig.properties?.streamIdleTimeoutMs, 1_800_000);
-});
 
-test("empty timeout input drops the leaf instead of writing a zero or null override", () => {
-  const result = resolveProviderModelDraftCommit({
-    currentModel: createModelFixture({
-      personalConfig: { properties: { streamIdleTimeoutMs: 900_000 } },
-    }),
-    draft: createDraftFixture({ streamIdleTimeoutValue: "" }),
+  it("empty timeout input drops the leaf instead of writing a zero or null override", () => {
+    const result = resolveProviderModelDraftCommit({
+      currentModel: createModelFixture({
+        personalConfig: { properties: { streamIdleTimeoutMs: 900_000 } },
+      }),
+      draft: createDraftFixture({ streamIdleTimeoutValue: "" }),
+    });
+    expect(result.status).toBe("commit");
+    if (result.status !== "commit") return;
+    expect(
+      result.model.personalConfig.properties?.streamIdleTimeoutMs,
+    ).toBeUndefined();
   });
-  assert.equal(result.status, "commit");
-  if (result.status !== "commit") return;
-  assert.equal(result.model.personalConfig.properties?.streamIdleTimeoutMs, undefined);
-});
 
-test("non-numeric timeout input is rejected on the streamIdleTimeout field", () => {
-  const result = resolveProviderModelDraftCommit({
-    currentModel: createModelFixture(),
-    draft: createDraftFixture({ streamIdleTimeoutValue: "abc" }),
+  it("non-numeric timeout input is rejected on the streamIdleTimeout field", () => {
+    const result = resolveProviderModelDraftCommit({
+      currentModel: createModelFixture(),
+      draft: createDraftFixture({ streamIdleTimeoutValue: "abc" }),
+    });
+    expect(result).toEqual({ status: "invalid", field: "streamIdleTimeout" });
   });
-  assert.deepEqual(result, { status: "invalid", field: "streamIdleTimeout" });
 });

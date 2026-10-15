@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { describe, expect, it } from "vitest";
 import type { WorkspaceFileTreeRow } from "../src/workspace-file-tree/model.js";
 import {
   createWorkspaceFileTreeEditingSession,
@@ -28,83 +27,104 @@ function makeRow({
   };
 }
 
-test("getWorkspaceEntryNameError mirrors service-side rules", () => {
-  assert.equal(getWorkspaceEntryNameError(""), "empty");
-  assert.equal(getWorkspaceEntryNameError("   "), "empty");
-  assert.equal(getWorkspaceEntryNameError(".."), "reserved");
-  assert.equal(getWorkspaceEntryNameError("a/b"), "separator");
-  assert.equal(getWorkspaceEntryNameError("a\\b"), "separator");
-  assert.equal(getWorkspaceEntryNameError("notes.md"), null);
-});
-
-test("resolveWorkspaceFileCreateParentPath targets the row itself for directories", () => {
-  const directory = makeRow({ path: "/ws/src/components", type: "directory" });
-  assert.equal(resolveWorkspaceFileCreateParentPath(directory), "/ws/src/components");
-  const file = makeRow({ path: "/ws/src/index.ts" });
-  assert.equal(resolveWorkspaceFileCreateParentPath(file), "/ws/src");
-});
-
-test("injectWorkspaceFileTreeDraftRow inserts at root top for workspace-level create", () => {
-  const rows = [
-    makeRow({ path: "/ws/src", type: "directory" }),
-    makeRow({ path: "/ws/package.json" }),
-  ];
-  const session = createWorkspaceFileTreeEditingSession({
-    mode: "create-file",
-    parentPath: "/ws",
+describe("workspaceFileEdit", () => {
+  it("getWorkspaceEntryNameError mirrors service-side rules", () => {
+    expect(getWorkspaceEntryNameError("")).toBe("empty");
+    expect(getWorkspaceEntryNameError("   ")).toBe("empty");
+    expect(getWorkspaceEntryNameError("..")).toBe("reserved");
+    expect(getWorkspaceEntryNameError("a/b")).toBe("separator");
+    expect(getWorkspaceEntryNameError("a\\b")).toBe("separator");
+    expect(getWorkspaceEntryNameError("notes.md")).toBe(null);
   });
-  const injected = injectWorkspaceFileTreeDraftRow({ rows, session, workspacePath: "/ws" });
-  assert.equal(injected.length, 3);
-  const draft = injected[0];
-  assert.ok(draft);
-  assert.equal(draft.editing, "create");
-  assert.equal(draft.depth, 0);
-  assert.equal(draft.type, "file");
-  assert.equal(draft.path, session.draftPath);
-});
 
-test("injectWorkspaceFileTreeDraftRow nests the draft right after the parent directory", () => {
-  const rows = [
-    makeRow({ path: "/ws/src", type: "directory", expanded: true }),
-    makeRow({ path: "/ws/src/index.ts", depth: 1 }),
-    makeRow({ path: "/ws/README.md" }),
-  ];
-  const session = createWorkspaceFileTreeEditingSession({
-    mode: "create-directory",
-    parentPath: "/ws/src",
+  it("resolveWorkspaceFileCreateParentPath targets the row itself for directories", () => {
+    const directory = makeRow({
+      path: "/ws/src/components",
+      type: "directory",
+    });
+    expect(resolveWorkspaceFileCreateParentPath(directory)).toBe(
+      "/ws/src/components",
+    );
+    const file = makeRow({ path: "/ws/src/index.ts" });
+    expect(resolveWorkspaceFileCreateParentPath(file)).toBe("/ws/src");
   });
-  const injected = injectWorkspaceFileTreeDraftRow({ rows, session, workspacePath: "/ws" });
-  assert.equal(injected.length, 4);
-  const draft = injected[1];
-  assert.ok(draft);
-  assert.equal(draft.editing, "create");
-  assert.equal(draft.depth, 1);
-  assert.equal(draft.type, "directory");
-  // 草稿行紧跟父目录行，排在既有子项之前。
-  assert.equal(injected[2]?.path, "/ws/src/index.ts");
-});
 
-test("injectWorkspaceFileTreeDraftRow is a no-op for rename sessions and missing parents", () => {
-  const rows = [makeRow({ path: "/ws/src/index.ts" })];
-  const renameSession = createWorkspaceFileTreeRenameSession(rows[0]!);
-  assert.equal(renameSession.mode, "rename");
-  assert.equal(renameSession.targetPath, "/ws/src/index.ts");
-  assert.equal(
-    injectWorkspaceFileTreeDraftRow({ rows, session: renameSession, workspacePath: "/ws" }),
-    rows,
-  );
-  const orphanCreate = createWorkspaceFileTreeEditingSession({
-    mode: "create-file",
-    parentPath: "/ws/not-loaded-yet",
+  it("injectWorkspaceFileTreeDraftRow inserts at root top for workspace-level create", () => {
+    const rows = [
+      makeRow({ path: "/ws/src", type: "directory" }),
+      makeRow({ path: "/ws/package.json" }),
+    ];
+    const session = createWorkspaceFileTreeEditingSession({
+      mode: "create-file",
+      parentPath: "/ws",
+    });
+    const injected = injectWorkspaceFileTreeDraftRow({
+      rows,
+      session,
+      workspacePath: "/ws",
+    });
+    expect(injected.length).toBe(3);
+    const draft = injected[0];
+    expect(draft).toBeTruthy();
+    expect(draft!.editing).toBe("create");
+    expect(draft!.depth).toBe(0);
+    expect(draft!.type).toBe("file");
+    expect(draft!.path).toBe(session.draftPath);
   });
-  assert.equal(
-    injectWorkspaceFileTreeDraftRow({ rows, session: orphanCreate, workspacePath: "/ws" }),
-    rows,
-  );
-});
 
-test("getWorkspaceEntryRenameSelectionEnd selects basename without extension", () => {
-  assert.equal(getWorkspaceEntryRenameSelectionEnd("index.ts"), 5);
-  assert.equal(getWorkspaceEntryRenameSelectionEnd(".env"), 4);
-  assert.equal(getWorkspaceEntryRenameSelectionEnd("folder"), 6);
+  it("injectWorkspaceFileTreeDraftRow nests the draft right after the parent directory", () => {
+    const rows = [
+      makeRow({ path: "/ws/src", type: "directory", expanded: true }),
+      makeRow({ path: "/ws/src/index.ts", depth: 1 }),
+      makeRow({ path: "/ws/README.md" }),
+    ];
+    const session = createWorkspaceFileTreeEditingSession({
+      mode: "create-directory",
+      parentPath: "/ws/src",
+    });
+    const injected = injectWorkspaceFileTreeDraftRow({
+      rows,
+      session,
+      workspacePath: "/ws",
+    });
+    expect(injected.length).toBe(4);
+    const draft = injected[1];
+    expect(draft).toBeTruthy();
+    expect(draft!.editing).toBe("create");
+    expect(draft!.depth).toBe(1);
+    expect(draft!.type).toBe("directory");
+    // 草稿行紧跟父目录行，排在既有子项之前。
+    expect(injected[2]?.path).toBe("/ws/src/index.ts");
+  });
+
+  it("injectWorkspaceFileTreeDraftRow is a no-op for rename sessions and missing parents", () => {
+    const rows = [makeRow({ path: "/ws/src/index.ts" })];
+    const renameSession = createWorkspaceFileTreeRenameSession(rows[0]!);
+    expect(renameSession.mode).toBe("rename");
+    expect(renameSession.targetPath).toBe("/ws/src/index.ts");
+    expect(
+      injectWorkspaceFileTreeDraftRow({
+        rows,
+        session: renameSession,
+        workspacePath: "/ws",
+      }),
+    ).toBe(rows);
+    const orphanCreate = createWorkspaceFileTreeEditingSession({
+      mode: "create-file",
+      parentPath: "/ws/not-loaded-yet",
+    });
+    expect(
+      injectWorkspaceFileTreeDraftRow({
+        rows,
+        session: orphanCreate,
+        workspacePath: "/ws",
+      }),
+    ).toBe(rows);
+  });
+
+  it("getWorkspaceEntryRenameSelectionEnd selects basename without extension", () => {
+    expect(getWorkspaceEntryRenameSelectionEnd("index.ts")).toBe(5);
+    expect(getWorkspaceEntryRenameSelectionEnd(".env")).toBe(4);
+    expect(getWorkspaceEntryRenameSelectionEnd("folder")).toBe(6);
+  });
 });

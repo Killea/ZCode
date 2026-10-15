@@ -10,6 +10,7 @@ export interface SidePaneTabPresentationLabels {
   whiteboardTitle: string;
   modelTrajectoryTitle: string;
   developerToolsTitle: string;
+  browserPermissionsTitle: string;
   terminalTitle: string;
   subagentTypeLabel: string;
   subagentDirectoryTitle: string;
@@ -25,6 +26,9 @@ export interface SidePaneTabPresentationLabels {
 export function getSidePaneTabSearchHint(tab: WorkspaceSidePaneTab): string {
   if (tab.type === "plan-detail") {
     return `${tab.parentSessionId} ${tab.toolCallId} plan ExitPlanMode`;
+  }
+  if (tab.type === "plugin-ui") {
+    return `${tab.title} ${tab.pluginId} ${tab.toolCallId ?? tab.surfaceId ?? ""} plugin ui`;
   }
   if (tab.type === "workflow-run") {
     return `${tab.workflowName ?? ""} ${tab.runId} ${tab.toolCallId} ${tab.parentSessionId} workflow run CreateWorkflow AmendWorkflow`;
@@ -52,6 +56,7 @@ export function getSidePaneTabSearchHint(tab: WorkspaceSidePaneTab): string {
   if (tab.type === "subagent-directory") {
     return `${tab.rootSessionId} ${tab.parentSessionId} subagent directory`;
   }
+  if (tab.type === "browser-permissions") return `${tab.origin} permissions settings`;
   if (tab.type === "browser") return tab.initialUrl ?? "";
   if (tab.type === "browser-use") {
     return `${tab.title ?? ""} ${tab.sessionId} browser use`;
@@ -79,6 +84,7 @@ export function getLocalizedSidePaneTabTitle(
     const titleByMessageId: Record<string, string> = {
       "browser.title": labels.browserTitle,
       "sidePane.files": labels.filesTitle,
+      "browser.permission.settings": labels.browserPermissionsTitle,
       "sidePane.review": labels.reviewTitle,
       "codeViewer.title": labels.codeViewerTitle,
       "treemapping.title": labels.treemappingTitle,
@@ -104,6 +110,7 @@ export function getSidePaneTabTypeLabel(
   labels: SidePaneTabPresentationLabels,
 ): string {
   if (tab.type === "plan-detail") return labels.planTitle;
+  if (tab.type === "plugin-ui") return tab.title;
   if (tab.type === "workflow-run") return labels.workflowRunTitle;
   if (tab.type === "workflow-directory") return labels.workflowDirectoryTitle;
   if (tab.type === "workflow-actor-session") return labels.workflowActorTitle;
@@ -115,6 +122,7 @@ export function getSidePaneTabTypeLabel(
   }
   if (tab.type === "subagent-directory") return labels.subagentDirectoryTitle;
   if (tab.type === "browser" || tab.type === "browser-use") return labels.browserTitle;
+  if (tab.type === "browser-permissions") return labels.browserPermissionsTitle;
   if (tab.type === "git") return labels.reviewTitle;
   if (tab.type === "file-tree") return labels.filesTitle;
   if (tab.type === "treemapping") return labels.treemappingTitle;

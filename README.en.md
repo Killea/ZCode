@@ -13,7 +13,7 @@
 
 **ZCodePlus** is a community-enhanced fork of the [ZCode](https://zcode.z.ai) open-source project. ZCode is an AI coding workspace with desktop, browser, and terminal interfaces; ZCodePlus keeps the full official feature set (clients, backend services, shared UI, Agent CLI and runtime) and layers on a set of improvements aimed at **self-hosted / local inference models** and the macOS desktop experience.
 
-> Baseline: this repository is built on the official ZCode open-source code (commit `872ad96`, "feat: open source"). Everything on top of that baseline is listed in [Differences from official ZCode](#differences-from-official-zcode). Product and CLI names (ZCode / ZCode Preview / the `zcode` command) are unchanged; "ZCodePlus" refers to this project (repository).
+> Baseline: this repository is built on the official ZCode open-source code (initial baseline commit `872ad96`, "feat: open source") and tracks upstream `zai-org/ZCode` through v3.15.1 (commit `aac4755`). Everything on top of the official version is listed in [Differences from official ZCode](#differences-from-official-zcode). Product and CLI names (ZCode / ZCode Preview / the `zcode` command) are unchanged; "ZCodePlus" refers to this project (repository).
 
 ## Differences from official ZCode
 
@@ -47,11 +47,10 @@
 - **Local build & runtime workflow documentation** (`f92ecd8`): desktop local shortcuts, CLI dist symlink fast rebuild, AppImage repack caveats.
 - **Extended typecheck coverage** (`eba56be`, `52258c0`): core and adapters package test files added to typecheck.
 
-| Interface                    | Purpose                                                                                   | Development command            |
-| ---------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------ |
-| Desktop                      | Electron desktop application                                                              | `pnpm dev:desktop`             |
-| Web / ZCode CLI distribution | Terminal and browser workspace; packages the TUI, Web client, backend, and Agent together | `pnpm dev:web`                 |
-| Agent CLI                    | The `zcode` terminal interface, which also provides the Agent runtime for Desktop and Web | `pnpm --filter @zcode/cli dev` |
+## Updates
+
+- 2026-10-10: Updated to ZCode v3.15.1.
+- 2026-9-23: Updated to ZCode v3.14.3.
 
 ## Setup
 
@@ -150,6 +149,12 @@ node apps/zcode-cli/packages/cli/dist/zcode.cjs --help
 ```
 
 This entry runs the Agent CLI directly and does not handle the distribution's `--web` switch. Use `pnpm dev:web` for Web development, or the extracted `bin/zcode.mjs` shown below to test the unified command.
+
+### UI Plugin development
+
+See the [UI Plugin guide](UI_PLUGIN.en.md) for the Excalidraw workflow, supported APIs, plugin installation and updates, and host debugging.
+
+**Plugin PRs in `zcode-plugins` must declare whether they affect a UI Plugin and list the plugin names in the PR template.** See the [required plugin-type declaration](UI_PLUGIN.en.md#declare-the-plugin-type-in-pull-requests).
 
 ## Configuration
 

@@ -33,7 +33,7 @@ export function resolveEnabledGlobalMemoryDir(config: AgentRuntimeConfig): strin
   return resolveGlobalMemoryDir(memory.cliStorageRoot);
 }
 
-function isMainMemoryTaskType(taskType: AgentRuntimeConfig["taskType"]): boolean {
+export function isMainMemoryTaskType(taskType: AgentRuntimeConfig["taskType"]): boolean {
   return (
     taskType === undefined ||
     taskType === "interactive" ||

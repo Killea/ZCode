@@ -1,8 +1,7 @@
-import assert from "node:assert/strict";
+import { expect, it } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
 import {
   injectPlistStringEntry,
   MACOS_LOCAL_NETWORK_USAGE_KEY,
@@ -35,52 +34,51 @@ function createFakeAppBundle(): string {
   return appPath;
 }
 
-test("injectPlistStringEntry appends key before root dict close", () => {
+it("injectPlistStringEntry appends key before root dict close", () => {
   const patched = injectPlistStringEntry(MINIMAL_PLIST, MACOS_LOCAL_NETWORK_USAGE_KEY, "desc");
   const keyIndex = patched.indexOf(`<key>${MACOS_LOCAL_NETWORK_USAGE_KEY}</key>`);
   const dictClose = patched.lastIndexOf("</dict>");
-  assert.ok(keyIndex > 0 && keyIndex < dictClose);
-  assert.ok(patched.includes("<string>desc</string>"));
+  expect(keyIndex > 0 && keyIndex < dictClose).toBeTruthy();
+  expect(patched.includes("<string>desc</string>")).toBeTruthy();
 });
 
-test("injectPlistStringEntry replaces existing value instead of duplicating", () => {
+it("injectPlistStringEntry replaces existing value instead of duplicating", () => {
   const once = injectPlistStringEntry(MINIMAL_PLIST, MACOS_LOCAL_NETWORK_USAGE_KEY, "old");
   const twice = injectPlistStringEntry(once, MACOS_LOCAL_NETWORK_USAGE_KEY, "new");
-  assert.equal(twice.split(MACOS_LOCAL_NETWORK_USAGE_KEY).length - 1, 1);
-  assert.ok(twice.includes("<string>new</string>"));
-  assert.ok(!twice.includes("<string>old</string>"));
+  expect(twice.split(MACOS_LOCAL_NETWORK_USAGE_KEY).length - 1).toBe(1);
+  expect(twice.includes("<string>new</string>")).toBeTruthy();
+  expect(!twice.includes("<string>old</string>")).toBeTruthy();
 });
 
-test("injectPlistStringEntry rejects non-XML plist content", () => {
-  assert.throws(() => injectPlistStringEntry("bplist00garbage", "k", "v"), /root dict/);
+it("injectPlistStringEntry rejects non-XML plist content", () => {
+  expect(() => injectPlistStringEntry("bplist00garbage", "k", "v")).toThrow(/root dict/);
 });
 
-test("description follows product name", () => {
-  assert.ok(macosLocalNetworkUsageDescription("ZCode Preview").includes("ZCode Preview"));
+it("description follows product name", () => {
+  expect(macosLocalNetworkUsageDescription("ZCode Preview").includes("ZCode Preview")).toBeTruthy();
 });
 
-test("patchMacBundleLocalNetworkUsage covers main app and helper bundles", async () => {
+it("patchMacBundleLocalNetworkUsage covers main app and helper bundles", async () => {
   const appPath = createFakeAppBundle();
   const patched = await patchMacBundleLocalNetworkUsage({
     appPath,
     description: "desc",
   });
-  assert.equal(patched.length, 2);
+  expect(patched.length).toBe(2);
   for (const plistPath of patched) {
     const content = readFileSync(plistPath, "utf8");
-    assert.ok(content.includes(`<key>${MACOS_LOCAL_NETWORK_USAGE_KEY}</key>`));
-    assert.ok(content.includes("<string>desc</string>"));
+    expect(content.includes(`<key>${MACOS_LOCAL_NETWORK_USAGE_KEY}</key>`)).toBeTruthy();
+    expect(content.includes("<string>desc</string>")).toBeTruthy();
   }
 });
 
-test("patchMacBundleLocalNetworkUsage throws when Frameworks directory is missing", async () => {
+it("patchMacBundleLocalNetworkUsage throws when Frameworks directory is missing", async () => {
   // 传错 appPath（例如把 Electron 框架品牌名当产品名）时 Frameworks 目录不存在，
   // 必须显式抛错而不是静默只处理主 app，否则 Helper 声明缺失且构建仍然成功。
   const appPath = mkdtempSync(join(tmpdir(), "local-network-no-frameworks-"));
   mkdirSync(join(appPath, "Contents"), { recursive: true });
   writeFileSync(join(appPath, "Contents", "Info.plist"), MINIMAL_PLIST, "utf8");
-  await assert.rejects(
-    () => patchMacBundleLocalNetworkUsage({ appPath, description: "desc" }),
+  await expect(patchMacBundleLocalNetworkUsage({ appPath, description: "desc" })).rejects.toThrow(
     /Frameworks/,
   );
 });

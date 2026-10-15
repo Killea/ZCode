@@ -35,6 +35,7 @@ import {
   openWorkflowArtifactSidePane,
   activateDeveloperToolsSidePane,
   openBrowserSidePane,
+  openBrowserPermissionsSidePane,
   openOrActivateBrowserSidePaneByUrl,
   findBrowserSidePaneTabByUrl,
   applyBrowserUseSidePaneEvent,
@@ -76,6 +77,8 @@ import {
   type WorkspaceSidePaneTab,
 } from "@/lib/workspaceSidePane.js";
 import { isSidePaneTabVisibleForParent } from "@/lib/workspaceSidePane.js";
+import { openPluginUiSidePane } from "@/plugin-ui/index.js";
+import type { OpenPluginUiSideTabRequest } from "@/plugin-ui/contract.js";
 import { logger } from "@/logger.js";
 import { getPathLeaf, joinFilePath, toFileUrl } from "@/lib/path.js";
 import { shouldOpenWorkflowArtifactInBrowser } from "@/lib/workflowArtifactOpen.js";
@@ -507,6 +510,21 @@ export function useAppPanels(options: {
     supportsEmbeddedBrowser,
     workspaceAbsPath,
   ]);
+
+  const handleOpenBrowserPermissionSettings = useCallback(
+    (origin: string) => {
+      if (!supportsEmbeddedBrowser) return;
+      revealSidePaneForCurrentOwner();
+      commitOpenedSidePaneState((current) =>
+        openBrowserPermissionsSidePane(current, {
+          origin,
+          ownerTaskId: sidePaneOwnerIdRef.current,
+          workspaceKey: activeWorkspaceKeyRef.current,
+        }),
+      );
+    },
+    [commitOpenedSidePaneState, revealSidePaneForCurrentOwner, supportsEmbeddedBrowser],
+  );
 
   // 下面这组 Browser View 事件都是 main 侧的权威转发，
   // 不能用 isWorkspaceVisible（= !isSettingsTabActive）当订阅门槛。设置页是覆盖层，App 不
@@ -970,6 +988,23 @@ export function useAppPanels(options: {
       logger.debug("[App] 打开计划详情右侧 tab", {
         parentSessionId: request.parentSessionId,
         toolCallId: request.toolCallId,
+        workspaceKey,
+      });
+    },
+    [commitOpenedSidePaneState, revealSidePaneForCurrentOwner],
+  );
+
+  const handleOpenPluginUi = useCallback(
+    (request: OpenPluginUiSideTabRequest) => {
+      const workspaceKey = request.workspaceIdentity?.trim() || request.workspacePath;
+      revealSidePaneForCurrentOwner();
+      commitOpenedSidePaneState((current) =>
+        openPluginUiSidePane(current, { ...request, workspaceKey }),
+      );
+      logger.debug("[App] 打开插件 UI 右侧 tab", {
+        parentSessionId: request.parentSessionId,
+        toolCallId: request.toolCallId,
+        pluginId: request.pluginId,
         workspaceKey,
       });
     },
@@ -1629,6 +1664,7 @@ export function useAppPanels(options: {
     handleOpenBrowserUrl,
     handleToggleBrowser,
     handleOpenBrowserTab,
+    handleOpenBrowserPermissionSettings,
     handleToggleGit,
     handleOpenGit,
     handleToggleFileTree,
@@ -1644,6 +1680,7 @@ export function useAppPanels(options: {
     handleSyncSubagentSessionTabs,
     handleOpenSelectionSideChat,
     handleOpenPlanDetail,
+    handleOpenPluginUi,
     handleOpenWorkflowRun,
     handleOpenWorkflowRunDirectory,
     handleOpenWorkflowActorSession,

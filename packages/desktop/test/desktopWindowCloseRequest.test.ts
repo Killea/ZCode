@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { expect, it } from "vitest";
 import {
   handleDesktopWindowCloseRequest,
   resolveShouldConfirmAppQuit,
@@ -30,7 +29,7 @@ function baseOptions(overrides: Partial<Parameters<typeof handleDesktopWindowClo
   return { options, calls };
 }
 
-test("有活跃会话 + 用户取消 → 拦截关闭且不退出", () => {
+it("有活跃会话 + 用户取消 → 拦截关闭且不退出", () => {
   const { options, calls } = baseOptions({
     shouldConfirmQuit: true,
     confirmQuit: () => {
@@ -38,12 +37,12 @@ test("有活跃会话 + 用户取消 → 拦截关闭且不退出", () => {
     },
   });
   const handled = handleDesktopWindowCloseRequest(options);
-  assert.equal(handled, true);
-  assert.equal(calls.requestQuit, 0);
-  assert.equal(calls.hideWindow, 0);
+  expect(handled).toBe(true);
+  expect(calls.requestQuit).toBe(0);
+  expect(calls.hideWindow).toBe(0);
 });
 
-test("有活跃会话 + 用户确认 → 正常退出", () => {
+it("有活跃会话 + 用户确认 → 正常退出", () => {
   let confirmCalled = 0;
   const { options, calls } = baseOptions({
     shouldConfirmQuit: true,
@@ -53,12 +52,12 @@ test("有活跃会话 + 用户确认 → 正常退出", () => {
     },
   });
   const handled = handleDesktopWindowCloseRequest(options);
-  assert.equal(handled, true);
-  assert.equal(confirmCalled, 1);
-  assert.equal(calls.requestQuit, 1);
+  expect(handled).toBe(true);
+  expect(confirmCalled).toBe(1);
+  expect(calls.requestQuit).toBe(1);
 });
 
-test("无活跃会话 → 跳过确认直接退出", () => {
+it("无活跃会话 → 跳过确认直接退出", () => {
   let confirmCalled = 0;
   const { options, calls } = baseOptions({
     shouldConfirmQuit: false,
@@ -68,82 +67,82 @@ test("无活跃会话 → 跳过确认直接退出", () => {
     },
   });
   const handled = handleDesktopWindowCloseRequest(options);
-  assert.equal(handled, true);
-  assert.equal(confirmCalled, 0);
-  assert.equal(calls.requestQuit, 1);
+  expect(handled).toBe(true);
+  expect(confirmCalled).toBe(0);
+  expect(calls.requestQuit).toBe(1);
 });
 
-test("forceQuit（更新安装等）→ 不拦截、不确认", () => {
+it("forceQuit（更新安装等）→ 不拦截、不确认", () => {
   const { options, calls } = baseOptions({ forceQuit: true, shouldConfirmQuit: true });
   const handled = handleDesktopWindowCloseRequest(options);
-  assert.equal(handled, false);
-  assert.equal(calls.confirmQuit, 0);
-  assert.equal(calls.requestQuit, 0);
+  expect(handled).toBe(false);
+  expect(calls.confirmQuit).toBe(0);
+  expect(calls.requestQuit).toBe(0);
 });
 
-test("非最后窗口 → 不拦截", () => {
+it("非最后窗口 → 不拦截", () => {
   const { options, calls } = baseOptions({ isLastWindow: false, shouldConfirmQuit: true });
   const handled = handleDesktopWindowCloseRequest(options);
-  assert.equal(handled, false);
-  assert.equal(calls.requestQuit, 0);
+  expect(handled).toBe(false);
+  expect(calls.requestQuit).toBe(0);
 });
 
-test("Windows close-to-tray → 隐藏窗口不退出", () => {
+it("Windows close-to-tray → 隐藏窗口不退出", () => {
   const { options, calls } = baseOptions({
     platform: "win32",
-    closeToTrayOnWindows: true,
+    closeToTray: true,
+    closeToTraySupported: true,
     shouldConfirmQuit: true,
   });
   const handled = handleDesktopWindowCloseRequest(options);
-  assert.equal(handled, true);
-  assert.equal(calls.hideWindow, 1);
-  assert.equal(calls.requestQuit, 0);
+  expect(handled).toBe(true);
+  expect(calls.hideWindow).toBe(1);
+  expect(calls.requestQuit).toBe(0);
 });
 
-test("Windows close-to-tray + 显式退出请求 → 不走托盘", () => {
+it("Windows close-to-tray + 显式退出请求 → 不走托盘", () => {
   const { options, calls } = baseOptions({
     platform: "win32",
-    closeToTrayOnWindows: true,
+    closeToTray: true,
+    closeToTraySupported: true,
     explicitQuitRequested: true,
     shouldConfirmQuit: true,
     confirmQuit: () => false,
   });
   const handled = handleDesktopWindowCloseRequest(options);
-  assert.equal(handled, true);
-  assert.equal(calls.hideWindow, 0);
-  assert.equal(calls.requestQuit, 0);
+  expect(handled).toBe(true);
+  expect(calls.hideWindow).toBe(0);
+  expect(calls.requestQuit).toBe(0);
 });
 
-test("确认门控：打包 + 有活跃会话 → 确认", () => {
-  assert.equal(resolveShouldConfirmAppQuit({ isPackaged: true, runningSessionCount: 1 }), true);
+it("确认门控：打包 + 有活跃会话 → 确认", () => {
+  expect(resolveShouldConfirmAppQuit({ isPackaged: true, runningSessionCount: 1 })).toBe(true);
 });
 
-test("确认门控：打包 + 无活跃会话 → 直接退出", () => {
-  assert.equal(resolveShouldConfirmAppQuit({ isPackaged: true, runningSessionCount: 0 }), false);
+it("确认门控：打包 + 无活跃会话 → 直接退出", () => {
+  expect(resolveShouldConfirmAppQuit({ isPackaged: true, runningSessionCount: 0 })).toBe(false);
 });
 
-test("确认门控：test 后端的打包 Preview 也拦截", () => {
+it("确认门控：test 后端的打包 Preview 也拦截", () => {
   // isPackaged 与后端环境无关：连 test 后端的安装包同样保护运行中会话。
-  assert.equal(
+  expect(
     resolveShouldConfirmAppQuit({
       isPackaged: true,
       runningSessionCount: 2,
     }),
-    true,
-  );
+  ).toBe(true);
 });
 
-test("确认门控：未打包 dev 运行不拦截", () => {
-  assert.equal(resolveShouldConfirmAppQuit({ isPackaged: false, runningSessionCount: 3 }), false);
+it("确认门控：未打包 dev 运行不拦截", () => {
+  expect(resolveShouldConfirmAppQuit({ isPackaged: false, runningSessionCount: 3 })).toBe(false);
 });
 
-test("确认门控：E2E 运行不拦截", () => {
-  assert.equal(
+it("确认门控：E2E 运行不拦截", () => {
+  expect(
     resolveShouldConfirmAppQuit({
       isPackaged: true,
       e2eRunId: "e2e-run-1",
       runningSessionCount: 3,
     }),
-    false,
-  );
+  ).toBe(false);
 });

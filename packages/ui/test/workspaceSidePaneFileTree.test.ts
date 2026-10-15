@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { describe, expect, it } from "vitest";
 import {
   activateFileTreeSidePane,
   closeSidePaneTab,
@@ -31,101 +30,105 @@ function createTerminalState(): WorkspaceSidePaneState {
   )!;
 }
 
-test("activateFileTreeSidePane 从空状态创建单例 file-tree tab 并激活", () => {
-  const next = activateFileTreeSidePane(null);
-  assert.equal(next.tabs.length, 1);
-  assert.equal(next.activeTabId, "file-tree");
-  assert.deepEqual(
-    next.tabs.map((tab) => tab.type),
-    ["file-tree"],
-  );
-});
-
-test("activateFileTreeSidePane 幂等：重复激活不复制 tab", () => {
-  const once = activateFileTreeSidePane(null);
-  const twice = activateFileTreeSidePane(once);
-  assert.equal(twice.tabs.length, 1);
-  assert.equal(twice.activeTabId, "file-tree");
-});
-
-test("activateFileTreeSidePane 保留既有 tab 并把 file-tree 激活", () => {
-  const next = activateFileTreeSidePane(createTerminalState());
-  assert.equal(next.tabs.length, 2);
-  assert.equal(next.activeTabId, "file-tree");
-  assert.ok(next.tabs.some((tab) => tab.id === "terminal:1"));
-});
-
-test("toggleFileTreeSidePane：file-tree 激活时关闭它；否则激活", () => {
-  const opened = toggleFileTreeSidePane(createTerminalState());
-  assert.ok(opened);
-  assert.equal(opened.activeTabId, "file-tree");
-
-  const closed = toggleFileTreeSidePane(opened);
-  // file-tree 是唯一被关闭的 tab，剩余 terminal tab 继续存活。
-  assert.ok(closed);
-  assert.deepEqual(
-    closed.tabs.map((tab) => tab.id),
-    ["terminal:1"],
-  );
-
-  const onlyFileTree = activateFileTreeSidePane(null);
-  // 关掉最后一个 tab 时整个面板状态归 null（收起）。
-  assert.equal(toggleFileTreeSidePane(onlyFileTree), null);
-});
-
-test("file-tree 是 workspace-global：不随 owner/parent 收窄", () => {
-  const state = stampSidePaneTabsOwnership(activateFileTreeSidePane(createTerminalState()), {
-    ownerTaskId: "task-a",
-    workspaceKey: "ws-1",
-  })!;
-  const fileTreeTab = state.tabs.find((tab) => tab.type === "file-tree");
-  assert.ok(fileTreeTab);
-  assert.equal(isSidePaneTabVisibleForParent(fileTreeTab, "task-other"), true);
-  assert.equal(isSidePaneTabVisibleForParent(fileTreeTab, null), true);
-
-  const visibleForOtherOwner = getVisibleSidePaneTabs(state.tabs, {
-    workspaceKey: "ws-1",
-    ownerTaskId: "task-other",
+describe("workspaceSidePane file-tree", () => {
+  it("activateFileTreeSidePane 从空状态创建单例 file-tree tab 并激活", () => {
+    const next = activateFileTreeSidePane(null);
+    expect(next.tabs.length).toBe(1);
+    expect(next.activeTabId).toBe("file-tree");
+    expect(next.tabs.map((tab) => tab.type)).toEqual(["file-tree"]);
   });
-  assert.deepEqual(
-    visibleForOtherOwner.map((tab) => tab.type),
-    ["file-tree"],
-  );
-});
 
-test("file-tree 匹配 workspaceKey：异 workspace scope 下不可见", () => {
-  const state = stampSidePaneTabsOwnership(activateFileTreeSidePane(createTerminalState()), {
-    ownerTaskId: "task-a",
-    workspaceKey: "ws-1",
-  })!;
-  const visibleForOtherWorkspace = getVisibleSidePaneTabs(state.tabs, {
-    workspaceKey: "ws-2",
-    ownerTaskId: "task-a",
+  it("activateFileTreeSidePane 幂等：重复激活不复制 tab", () => {
+    const once = activateFileTreeSidePane(null);
+    const twice = activateFileTreeSidePane(once);
+    expect(twice.tabs.length).toBe(1);
+    expect(twice.activeTabId).toBe("file-tree");
   });
-  assert.equal(visibleForOtherWorkspace.length, 0);
-});
 
-test("task 切换后 file-tree tab 保留且仍可激活", () => {
-  const state = stampSidePaneTabsOwnership(activateFileTreeSidePane(createTerminalState()), {
-    ownerTaskId: "task-a",
-    workspaceKey: "ws-1",
-  })!;
-  const resolved = resolveSidePaneScopeState(state, {
-    workspaceKey: "ws-1",
-    ownerTaskId: "task-b",
+  it("activateFileTreeSidePane 保留既有 tab 并把 file-tree 激活", () => {
+    const next = activateFileTreeSidePane(createTerminalState());
+    expect(next.tabs.length).toBe(2);
+    expect(next.activeTabId).toBe("file-tree");
+    expect(next.tabs.some((tab) => tab.id === "terminal:1")).toBeTruthy();
   });
-  assert.ok(resolved.sidePaneState);
-  assert.equal(resolved.sidePaneState.activeTabId, "file-tree");
-  assert.equal(resolved.isSidePaneCollapsed, false);
-});
 
-test("closeSidePaneTab / restoreSidePaneTab 对 file-tree 走通用路径", () => {
-  const opened = activateFileTreeSidePane(null);
-  const fileTreeTab = opened.tabs[0]!;
-  const closed = closeSidePaneTab(opened, "file-tree");
-  assert.equal(closed, null);
+  it("toggleFileTreeSidePane：file-tree 激活时关闭它；否则激活", () => {
+    const opened = toggleFileTreeSidePane(createTerminalState());
+    expect(opened).toBeTruthy();
+    expect(opened!.activeTabId).toBe("file-tree");
 
-  const restored = restoreSidePaneTab(closed, fileTreeTab);
-  assert.equal(restored.activeTabId, "file-tree");
-  assert.equal(getActiveSidePaneTab(restored)?.type, "file-tree");
+    const closed = toggleFileTreeSidePane(opened);
+    // file-tree 是唯一被关闭的 tab，剩余 terminal tab 继续存活。
+    expect(closed).toBeTruthy();
+    expect(closed!.tabs.map((tab) => tab.id)).toEqual(["terminal:1"]);
+
+    const onlyFileTree = activateFileTreeSidePane(null);
+    // 关掉最后一个 tab 时整个面板状态归 null（收起）。
+    expect(toggleFileTreeSidePane(onlyFileTree)).toBe(null);
+  });
+
+  it("file-tree 是 workspace-global：不随 owner/parent 收窄", () => {
+    const state = stampSidePaneTabsOwnership(
+      activateFileTreeSidePane(createTerminalState()),
+      {
+        ownerTaskId: "task-a",
+        workspaceKey: "ws-1",
+      },
+    )!;
+    const fileTreeTab = state.tabs.find((tab) => tab.type === "file-tree");
+    expect(fileTreeTab).toBeTruthy();
+    expect(isSidePaneTabVisibleForParent(fileTreeTab!, "task-other")).toBe(
+      true,
+    );
+    expect(isSidePaneTabVisibleForParent(fileTreeTab!, null)).toBe(true);
+
+    const visibleForOtherOwner = getVisibleSidePaneTabs(state.tabs, {
+      workspaceKey: "ws-1",
+      ownerTaskId: "task-other",
+    });
+    expect(visibleForOtherOwner.map((tab) => tab.type)).toEqual(["file-tree"]);
+  });
+
+  it("file-tree 匹配 workspaceKey：异 workspace scope 下不可见", () => {
+    const state = stampSidePaneTabsOwnership(
+      activateFileTreeSidePane(createTerminalState()),
+      {
+        ownerTaskId: "task-a",
+        workspaceKey: "ws-1",
+      },
+    )!;
+    const visibleForOtherWorkspace = getVisibleSidePaneTabs(state.tabs, {
+      workspaceKey: "ws-2",
+      ownerTaskId: "task-a",
+    });
+    expect(visibleForOtherWorkspace.length).toBe(0);
+  });
+
+  it("task 切换后 file-tree tab 保留且仍可激活", () => {
+    const state = stampSidePaneTabsOwnership(
+      activateFileTreeSidePane(createTerminalState()),
+      {
+        ownerTaskId: "task-a",
+        workspaceKey: "ws-1",
+      },
+    )!;
+    const resolved = resolveSidePaneScopeState(state, {
+      workspaceKey: "ws-1",
+      ownerTaskId: "task-b",
+    });
+    expect(resolved.sidePaneState).toBeTruthy();
+    expect(resolved.sidePaneState!.activeTabId).toBe("file-tree");
+    expect(resolved.isSidePaneCollapsed).toBe(false);
+  });
+
+  it("closeSidePaneTab / restoreSidePaneTab 对 file-tree 走通用路径", () => {
+    const opened = activateFileTreeSidePane(null);
+    const fileTreeTab = opened.tabs[0]!;
+    const closed = closeSidePaneTab(opened, "file-tree");
+    expect(closed).toBe(null);
+
+    const restored = restoreSidePaneTab(closed, fileTreeTab);
+    expect(restored.activeTabId).toBe("file-tree");
+    expect(getActiveSidePaneTab(restored)?.type).toBe("file-tree");
+  });
 });

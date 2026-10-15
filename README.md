@@ -13,7 +13,7 @@
 
 **ZCodePlus** 是 [ZCode](https://zcode.z.ai) 开源项目的社区增强版。ZCode 是 AI 编程工作台，提供桌面应用、浏览器界面和终端 Agent；ZCodePlus 在保留官方完整功能（客户端、后端服务、共享 UI、Agent CLI 与运行时源码）的基础上，叠加了一批面向**自托管 / 本地推理模型**场景与 macOS 桌面体验的改进。
 
-> 基线说明：本仓库基于官方 ZCode 开源代码（commit `872ad96`，"feat: open source"）构建，其上全部改动见下文「[与官方 ZCode 的区别](#与官方-zcode-的区别)」。应用与 CLI 的产品名（ZCode / ZCode Preview / `zcode` 命令）保持不变，ZCodePlus 仅指本仓库这一工程。
+> 基线说明：本仓库基于官方 ZCode 开源代码（初始基线 commit `872ad96`，"feat: open source"）构建，并已跟进上游 `zai-org/ZCode` 至 v3.15.1（commit `aac4755`）。相对官方版本的全部改动见下文「[与官方 ZCode 的区别](#与官方-zcode-的区别)」。应用与 CLI 的产品名（ZCode / ZCode Preview / `zcode` 命令）保持不变，ZCodePlus 仅指本仓库这一工程。
 
 ## 与官方 ZCode 的区别
 
@@ -47,11 +47,10 @@
 - **本机构建与运行工作流文档**（`f92ecd8`）：桌面本地快捷方式、CLI dist 符号链接快速重编、AppImage 重打包注意事项等。
 - **typecheck 覆盖扩展**（`eba56be`、`52258c0`）：core 与 adapters 包的测试文件纳入 typecheck。
 
-| 入口                 | 用途                                                           | 开发命令                       |
-| -------------------- | -------------------------------------------------------------- | ------------------------------ |
-| Desktop              | Electron 桌面应用                                              | `pnpm dev:desktop`             |
-| Web / ZCode 命令行版 | 终端与浏览器工作台；将 TUI、Web、后端和 Agent 组装为独立运行包 | `pnpm dev:web`                 |
-| Agent CLI            | 在终端中使用 `zcode`，也为 Desktop 和 Web 提供 Agent 运行时    | `pnpm --filter @zcode/cli dev` |
+## 更新
+
+- 2026-10-10：更新至 ZCode v3.15.1 版本。
+- 2026-9-23：更新至 ZCode v3.14.3 版本。
 
 ## 初始化
 
@@ -154,6 +153,12 @@ node apps/zcode-cli/packages/cli/dist/zcode.cjs --help
 ```
 
 这个入口直接运行 Agent CLI，不经过发行包的 `--web` 分流。开发 Web 用 `pnpm dev:web`；验证统一的 `zcode` 命令，用下方解压后的 `bin/zcode.mjs`。
+
+### UI Plugin 开发
+
+参见 [UI Plugin：能力、API 与调试](UI_PLUGIN.md)，从 Excalidraw 的画布协作示例开始，了解插件安装更新、页面 API 和宿主联调入口。
+
+**向 `zcode-plugins` 提交插件 PR 时，必须在 PR 模板中声明是否为 UI Plugin，并填写插件名称。** 判断标准见[提交 PR 时声明插件类型](UI_PLUGIN.md#提交-pr-时声明插件类型)。
 
 ## 配置
 
