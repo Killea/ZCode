@@ -72,6 +72,7 @@ export const SETTINGS_USER_ACTION_FEATURES = {
   "settings.notification": ["toggle_notification", "toggle_notification_sound"],
   "settings.conversation": [
     "change_interaction_behavior",
+    "change_default_session_mode",
     "toggle_ask_user_auto_resolution",
     "toggle_model_io_retention",
     "toggle_show_reasoning",

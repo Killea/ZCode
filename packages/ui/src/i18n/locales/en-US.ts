@@ -2614,6 +2614,9 @@ const enUS: Record<string, string> = {
   "settings.toolGroupingChanges": "Group file changes",
   "settings.toolGroupingChangesDescription":
     "Group consecutive Write, Edit, and ApplyPatch calls into a Changes section.",
+  "settings.defaultSessionMode": "Default mode",
+  "settings.defaultSessionModeDescription":
+    "Permission mode used when a new task has no recent submission in this workspace. With Full access, new tasks run without confirmations by default.",
   "settings.zcodeInteractionBehavior": "Interaction behavior",
   "settings.zcodeInteractionBehaviorDescription":
     "While ZCode is running, add follow-up actions to the queue or guide them to run after the next tool call.",

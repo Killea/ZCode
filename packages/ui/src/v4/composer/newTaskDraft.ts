@@ -1,3 +1,4 @@
+import type { ZCodeDefaultSessionMode } from "@zcode/shared";
 import type { ModelSelectionView } from "@zcode/services";
 import { readComposerRecent, resolveDraftInitialModelSelection } from "@/lib/composerRecent.js";
 import {
@@ -13,12 +14,15 @@ export function initializeNewTaskDraft(
   workspacePath: string,
   workspaceIdentity: string | undefined,
   view: ModelSelectionView,
+  defaultSessionMode?: ZCodeDefaultSessionMode,
 ): V4ComposerDraft {
   const recent = readComposerRecent(workspacePath, workspaceIdentity);
+  // 种子优先级（docs/composer-default-mode.md）：Recent（本 workspace 最近一次显式提交）
+  // > 缺省模式设置（fork 缺省 yolo）> build。Recent 不得被设置覆盖。
   return {
     ...draft,
     initializeFromNewTask: undefined,
-    mode: recent?.mode === "plan" ? "build" : (recent?.mode ?? "build"),
+    mode: recent?.mode === "plan" ? "build" : (recent?.mode ?? defaultSessionMode ?? "build"),
     planEnabled: false,
     modelSelection:
       recent?.modelSelection ??

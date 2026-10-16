@@ -12,7 +12,8 @@ describe("user action trace catalog", () => {
     // 全局记忆特性（da989be6）为 workbench.file 新增 close_tree（文件树侧栏关闭），core 组 94 → 95
     expect(USER_ACTION_CATALOG.filter((entry) => entry.group === "core")).toHaveLength(95);
     // 全局记忆特性（da989be6）为 settings.memory 新增 switch_memory_tab / toggle_global_memory / save_global_memory，settings 组 44 → 47
-    expect(USER_ACTION_CATALOG.filter((entry) => entry.group === "settings")).toHaveLength(47);
+    // 默认模式设置（docs/composer-default-mode.md）为 settings.conversation 新增 change_default_session_mode，settings 组 47 → 48
+    expect(USER_ACTION_CATALOG.filter((entry) => entry.group === "settings")).toHaveLength(48);
   });
 
   it("feature/action 组合唯一且不使用动态标识", () => {

@@ -2458,6 +2458,9 @@ const zhCN: Record<string, string> = {
   "settings.toolGroupingChanges": "分组文件更改",
   "settings.toolGroupingChangesDescription":
     "将连续的 Write、Edit 和 ApplyPatch 调用聚合为 Changes 分组。",
+  "settings.defaultSessionMode": "默认模式",
+  "settings.defaultSessionModeDescription":
+    "新任务没有最近提交记录时使用的权限模式。选择「完全访问」时，新任务默认免确认执行。",
   "settings.zcodeInteractionBehavior": "交互行为",
   "settings.zcodeInteractionBehaviorDescription":
     "在 ZCode 运行时将后续操作加入队列，或引导至下一轮工具调用后运行。",

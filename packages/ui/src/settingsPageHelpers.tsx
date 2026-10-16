@@ -3,12 +3,17 @@ import type {
   IntegratedTerminalShellOption,
   IntegratedTerminalShellSelection,
   LocalePreference,
+  ZCodeDefaultSessionMode,
   ZCodeInteractionBehavior,
 } from "@zcode/shared";
 import {
+  DEFAULT_ZCODE_DEFAULT_SESSION_MODE,
+  getZCodeAgentAvailableModes,
   TID_SETTINGS_ASK_USER_QUESTION_AUTO_RESOLUTION_SWITCH,
   TID_SETTINGS_NATIVE_SEARCH_SWITCH,
+  ZCODE_AGENT_PROVIDER,
 } from "@zcode/shared";
+import { getModeOptionDisplayLabel } from "@/chat-input-toolbar/display.js";
 import { useState, useCallback, useEffect } from "react";
 import type { IPlatformService } from "@zcode/shared";
 import {
@@ -83,6 +88,7 @@ export function GeneralSectionContent({
   toolGroupingTerminalEnabled,
   toolGroupingChangesEnabled,
   zcodeInteractionBehavior,
+  defaultSessionMode = DEFAULT_ZCODE_DEFAULT_SESSION_MODE,
   askUserQuestionAutoResolutionEnabled = true,
   modelIoFullRetentionEnabled = false,
   onDataBaseDirChange,
@@ -107,6 +113,7 @@ export function GeneralSectionContent({
   onToolGroupingTerminalEnabledChange,
   onToolGroupingChangesEnabledChange,
   onZCodeInteractionBehaviorChange,
+  onDefaultSessionModeChange = async () => {},
   onAskUserQuestionAutoResolutionEnabledChange = async () => {},
   onModelIoFullRetentionEnabledChange = async () => {},
   onOpenOnboardingDialog,
@@ -157,6 +164,8 @@ export function GeneralSectionContent({
   toolGroupingTerminalEnabled: boolean;
   toolGroupingChangesEnabled: boolean;
   zcodeInteractionBehavior: ZCodeInteractionBehavior;
+  /** 新任务缺省权限模式（docs/composer-default-mode.md）；缺省取 fork 共享默认（yolo）。 */
+  defaultSessionMode?: ZCodeDefaultSessionMode;
   askUserQuestionAutoResolutionEnabled?: boolean;
   modelIoFullRetentionEnabled?: boolean;
   onDataBaseDirChange: (dir: string) => Promise<void>;
@@ -181,6 +190,7 @@ export function GeneralSectionContent({
   onToolGroupingTerminalEnabledChange: (enabled: boolean) => Promise<void>;
   onToolGroupingChangesEnabledChange: (enabled: boolean) => Promise<void>;
   onZCodeInteractionBehaviorChange: (behavior: ZCodeInteractionBehavior) => Promise<void>;
+  onDefaultSessionModeChange?: (mode: ZCodeDefaultSessionMode) => Promise<void>;
   onAskUserQuestionAutoResolutionEnabledChange?: (enabled: boolean) => Promise<void>;
   onModelIoFullRetentionEnabledChange?: (enabled: boolean) => Promise<void>;
   onOpenOnboardingDialog: () => void;
@@ -693,6 +703,41 @@ export function GeneralSectionContent({
       </SettingsGroupCard>
 
       <SettingsGroupCard>
+        {/* docs/composer-default-mode.md：候选与 composer 权限单选同构（隐藏 plan 勾选档与历史 edit）。 */}
+        <SettingsRow
+          label={intl.formatMessage({ id: "settings.defaultSessionMode" })}
+          description={intl.formatMessage({
+            id: "settings.defaultSessionModeDescription",
+          })}
+          control={
+            <Select
+              value={defaultSessionMode}
+              onValueChange={(value) => {
+                void onDefaultSessionModeChange(value as ZCodeDefaultSessionMode);
+              }}
+            >
+              <SelectTrigger
+                size="lg"
+                className="w-[260px] min-w-0 justify-between"
+                data-testid="settings-default-session-mode-select"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {getZCodeAgentAvailableModes()
+                  .filter((mode) => mode.id !== "plan")
+                  .map((mode) => (
+                    <SelectItem key={mode.id} value={mode.id}>
+                      {getModeOptionDisplayLabel(intl, ZCODE_AGENT_PROVIDER, {
+                        value: mode.id,
+                        name: mode.name,
+                      })}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          }
+        />
         <SettingsRow
           label={intl.formatMessage({ id: "settings.zcodeInteractionBehavior" })}
           description={intl.formatMessage({

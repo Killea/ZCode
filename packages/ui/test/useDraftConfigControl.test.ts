@@ -2,6 +2,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ZCodeConfigOption } from "@zcode/shared";
+import { DEFAULT_ZCODE_DEFAULT_SESSION_MODE } from "@zcode/shared";
 import type { SessionConfigState } from "@zcode/shared/zcode-protocol-v4";
 import type { IModelSelectionService, ModelSelectionView } from "@zcode/services";
 import { resolveEffectiveModelSelection, type ProviderRegistryView } from "@zcode/provider";
@@ -290,7 +291,8 @@ describe("useDraftConfigControl slash command hydration", () => {
       }
       await act(async () => root.render(createElement(Probe, { ready: true })));
       expect(control!.composerDraft.text).toBe("content stays");
-      expect(control!.draftConfig.mode).toBe("build");
+      // 新任务种子无 Recent → fork 共享缺省（docs/composer-default-mode.md）。
+      expect(control!.draftConfig.mode).toBe(DEFAULT_ZCODE_DEFAULT_SESSION_MODE);
       expect(control!.draftConfig.planEnabled).toBe(edited === "mode");
       if (edited === "mode") expect(control!.composerDraft.modelSelection).toBeUndefined();
       else expect(control!.draftConfig.modelSelection?.modelId).toBe("model");
@@ -621,8 +623,9 @@ describe("useDraftConfigControl slash command hydration", () => {
     expect(control!.resolveInitialDraftConfig()?.modelSelection).toBeUndefined();
     act(() => control!.updateComposerContent({ text: "保留原选择" }));
     act(() => control!.handleDraftSwitchMode("plan"));
+    // 新任务种子无 Recent → fork 共享缺省；plan 勾选只动 planEnabled，mode 保留种子值。
     expect(readV4ComposerDraft(workspacePath, undefined, "__draft__")).toMatchObject({
-      mode: "build",
+      mode: DEFAULT_ZCODE_DEFAULT_SESSION_MODE,
       planEnabled: true,
       text: "保留原选择",
       modelSelection: { providerId: "provider", modelId: "old" },

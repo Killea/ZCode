@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { appSettingsPatchSchema, appSettingsSchema } from "../src/validationAppSettings.js";
+import {
+  DEFAULT_ZCODE_DEFAULT_SESSION_MODE,
+  zcodeDefaultSessionModeSchema,
+} from "../src/execution-state.js";
 
 describe("app settings", () => {
   it("round-trips every structured Provider Family connection selection", () => {
@@ -280,5 +284,38 @@ describe("dynamicWorkflowMode 设置（DWG-19）", () => {
     expect(appSettingsSchema.parse({ dynamicWorkflowMode: "future" }).dynamicWorkflowMode).toBe(
       undefined,
     );
+  });
+});
+
+// docs/composer-default-mode.md：新任务缺省权限模式。未知取值只把本字段降级为缺席，
+// 不能触发整份设置回落 defaultSettings()（读取边界 catch(undefined)）。
+describe("defaultSessionMode 设置（composer-default-mode）", () => {
+  it("补丁接受四个可切换权限档，拒绝 plan / auto / 未知值", () => {
+    for (const value of ["build", "edit", "guarded", "yolo"]) {
+      expect(appSettingsPatchSchema.parse({ defaultSessionMode: value })).toEqual({
+        defaultSessionMode: value,
+      });
+    }
+    for (const rejected of ["plan", "auto", "bogus"]) {
+      expect(appSettingsPatchSchema.safeParse({ defaultSessionMode: rejected }).success).toBe(false);
+    }
+  });
+
+  it("文件里的合法值原样读出，缺席保持缺席，未知值按缺省读成缺席且不影响其它字段", () => {
+    expect(appSettingsSchema.parse({ defaultSessionMode: "yolo" }).defaultSessionMode).toBe("yolo");
+    expect(appSettingsSchema.parse({}).defaultSessionMode).toBeUndefined();
+    const unknown = appSettingsSchema.parse({ defaultSessionMode: "future", memoryEnabled: true });
+    expect(unknown.defaultSessionMode).toBeUndefined();
+    expect(unknown.memoryEnabled).toBe(true);
+  });
+
+  it("fork 共享缺省为 yolo（完全访问）", () => {
+    expect(DEFAULT_ZCODE_DEFAULT_SESSION_MODE).toBe("yolo");
+    for (const value of ["build", "edit", "guarded", "yolo"]) {
+      expect(zcodeDefaultSessionModeSchema.safeParse(value).success).toBe(true);
+    }
+    for (const rejected of ["plan", "auto"]) {
+      expect(zcodeDefaultSessionModeSchema.safeParse(rejected).success).toBe(false);
+    }
   });
 });

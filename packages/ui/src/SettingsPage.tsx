@@ -22,6 +22,7 @@ import type {
   Locale,
   UsageEntitlementSnapshot,
   UserInfo,
+  ZCodeDefaultSessionMode,
   ZCodeInteractionBehavior,
 } from "@zcode/shared";
 import {
@@ -1334,6 +1335,20 @@ export function SettingsPage({
     },
     [updateSharedSettings],
   );
+  // docs/composer-default-mode.md：只写全局设置；新任务种子在下次草稿初始化时读取，
+  // 已有会话与既有草稿不受影响（草稿 mode 是意图标记，不回填）。
+  const handleDefaultSessionModeChange = useCallback(
+    async (mode: ZCodeDefaultSessionMode) => {
+      await runSettingsActionAsync({
+        featureId: "settings.conversation",
+        action: "change_default_session_mode",
+        trigger: "select",
+        operation: () => updateSharedSettings({ defaultSessionMode: mode }),
+        completed: { resultSource: "shared_settings", valueAfter: mode },
+      });
+    },
+    [updateSharedSettings],
+  );
   const handleFooterLocaleChange = useCallback(
     (value: string) => {
       if (value === "system") {
@@ -1790,6 +1805,8 @@ export function SettingsPage({
                             toolGroupingTerminalEnabled={toolGroupingTerminalEnabled}
                             toolGroupingChangesEnabled={toolGroupingChangesEnabled}
                             zcodeInteractionBehavior={zcodeInteractionBehavior}
+                            defaultSessionMode={sharedSettings?.defaultSessionMode}
+                            onDefaultSessionModeChange={handleDefaultSessionModeChange}
                             askUserQuestionAutoResolutionEnabled={
                               askUserQuestionAutoResolutionEnabled
                             }

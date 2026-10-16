@@ -6,7 +6,11 @@ import { applyComposerPermissionGrant } from "@/v4/composer/composerPermissionGr
 // Workspace presentation 水合只提供 mode 与 slash commands；模型候选、能力和首选值
 // 统一来自目标 Host ModelSelectionView。
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ZCODE_AGENT_PROVIDER, resolveExecutionState } from "@zcode/shared";
+import {
+  DEFAULT_ZCODE_DEFAULT_SESSION_MODE,
+  ZCODE_AGENT_PROVIDER,
+  resolveExecutionState,
+} from "@zcode/shared";
 import { applyComposerPlanTransition } from "@/v4/composer/composerPlanTransition.js";
 import type {
   ZCodeConfigOption,
@@ -123,7 +127,7 @@ export function useDraftConfigControl(params: {
   const workspaceKey = workspaceIdentity?.trim() || workspacePath;
   const displayProvider = provider ?? ZCODE_AGENT_PROVIDER;
   const zcodeSessionService = useZCodeSessionService(workspacePath, null, workspaceIdentity);
-  const { settings: sharedSettings } = useSettings();
+  const { settings: sharedSettings, loading: settingsLoading } = useSettings();
   const appFollowupMode = resolveAppFollowupMode(sharedSettings);
   const scopeId = sessionId ?? V4_DRAFT_SCOPE_ROOT;
   const scopeKey = JSON.stringify([workspaceKey, scopeId]);
@@ -151,14 +155,30 @@ export function useDraftConfigControl(params: {
   const modelSelectionView =
     modelSelectionRead.state.status === "ready" ? modelSelectionRead.state.view : null;
   const initializeAsNewTask = sessionId === null || draft.initializeFromNewTask === true;
-  if (!draft.mode && (initializeAsNewTask ? modelSelectionView !== null : sessionConfig != null)) {
+  // 新任务种子必须等 settings 解析完成：缺省模式设置参与种子，抢跑会把预加载的回退值
+  // 固化进草稿（草稿是意图标记，后续 snapshot 不回填）；读取失败（终态 error）按 fork
+  // 共享缺省起稿。已有 session 分支只依赖 sessionConfig，不需要等 settings。
+  const settingsResolved = sharedSettings !== null || !settingsLoading;
+  if (
+    !draft.mode &&
+    (initializeAsNewTask
+      ? modelSelectionView !== null && settingsResolved
+      : sessionConfig != null)
+  ) {
     const mode = submissionModeSchema.safeParse(sessionConfig?.mode);
     // Recent 是初始化原意图，不先按旧 Provider 是否仍在候选中删掉；下一次输入读取
     // 由同一解析入口对应当前账号，或暂时留空。否则冷启动会绕过统一账号对应规则。
     // mode 是已初始化标记：历史恢复给出的空选择也是确定结果，后续 Snapshot 不得填满。
     draft =
       initializeAsNewTask && modelSelectionView
-        ? initializeNewTaskDraft(draft, workspacePath, workspaceIdentity, modelSelectionView)
+        ? initializeNewTaskDraft(
+            draft,
+            workspacePath,
+            workspaceIdentity,
+            modelSelectionView,
+            // 字段缺失（新装/旧版本）或读取失败时按 fork 共享缺省（yolo）起稿。
+            sharedSettings?.defaultSessionMode ?? DEFAULT_ZCODE_DEFAULT_SESSION_MODE,
+          )
         : {
             ...draft,
             mode: mode.success && mode.data !== "plan" ? mode.data : "build",
@@ -238,9 +258,13 @@ export function useDraftConfigControl(params: {
         ...current,
         mode: mode.success ? mode.data : current.mode,
         modelSelection: next.modelSelection,
-        // 用户已经显式改选，不能再由导入时等待的默认初始化覆盖。
+        // 用户已经显式改选，不能再由导入时等待的默认初始化覆盖；mode 未动时
+        // 同样按 fork 缺省起稿（docs/composer-default-mode.md），不得硬回落 build。
         ...(current.initializeFromNewTask
-          ? { mode: mode.success ? mode.data : "build", initializeFromNewTask: undefined }
+          ? {
+              mode: mode.success ? mode.data : DEFAULT_ZCODE_DEFAULT_SESSION_MODE,
+              initializeFromNewTask: undefined,
+            }
           : {}),
       }));
     },
@@ -462,7 +486,10 @@ export function useDraftConfigControl(params: {
       if (mode === "plan" || mode === "plan-off") {
         updateComposerDraft((current) => ({
           ...current,
-          mode: current.mode === "plan" ? "build" : (current.mode ?? "build"),
+          // 未初始化草稿勾选 plan 时的 pre-plan 权限同样按 fork 缺省起稿
+          // （docs/composer-default-mode.md），不得硬回落 build 与种子分裂。
+          mode:
+            current.mode === "plan" ? "build" : (current.mode ?? DEFAULT_ZCODE_DEFAULT_SESSION_MODE),
           planEnabled: mode === "plan",
           initializeFromNewTask: undefined,
         }));
