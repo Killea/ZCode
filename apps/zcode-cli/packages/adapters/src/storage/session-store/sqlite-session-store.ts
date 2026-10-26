@@ -39,6 +39,7 @@ import type {
   ScriptWorkflowStorePort,
   SessionGoal,
   SessionId,
+  SessionImportCommitBundle,
   SessionInfo,
   SessionInputDelivery,
   SessionInputRecord,
@@ -97,6 +98,7 @@ import * as messageRepository from "./repositories/messages.js";
 import * as scriptWorkflowActivityRepository from "./repositories/script-workflow-activities.js";
 import * as scriptWorkflowRunRepository from "./repositories/script-workflow-runs.js";
 import * as sessionEntryRepository from "./repositories/session-entries.js";
+import * as sessionImportRepository from "./repositories/session-import.js";
 import * as sessionInputRepository from "./repositories/session-inputs.js";
 import * as sessionRepository from "./repositories/sessions.js";
 import * as todoRepository from "./repositories/todos.js";
@@ -221,7 +223,6 @@ function assertForkBundleChildLocal(bundle: ForkCommitBundle): void {
 }
 
 const deferredStartup = Symbol("deferredSqliteStartup");
-
 export class SqliteSessionStore
   implements
     SessionStorePort,
@@ -511,6 +512,11 @@ export class SqliteSessionStore
       this.db.exec("rollback");
       throw error;
     }
+  }
+
+  async commitSessionImportBundle(bundle: SessionImportCommitBundle): Promise<SessionInfo> {
+    this.throwBeforeWrite();
+    return sessionImportRepository.commitSessionImportBundle(this.db, bundle);
   }
 
   async transitionSharedContextImport(input: SharedContextImportTransition): Promise<boolean> {

@@ -94,6 +94,8 @@ export interface CanonicalUserIntentFact extends CanonicalConversationFactBase {
   modelSelection?: TurnInputIntentMetadata["modelSelection"];
   mode?: TurnInputIntentMetadata["mode"];
   planEnabled?: boolean;
+  includeGlobalMemory?: boolean;
+  includedGlobalMemoryIds?: readonly string[];
   provenance?: {
     sourceCommandId: string;
     queueItemId?: string;
@@ -288,6 +290,12 @@ function normalizeTurnStarted(
     ...(payload.intent?.mode ? { mode: payload.intent.mode } : {}),
     ...(payload.intent?.planEnabled !== undefined
       ? { planEnabled: payload.intent.planEnabled }
+      : {}),
+    ...(payload.intent?.includeGlobalMemory !== undefined
+      ? { includeGlobalMemory: payload.intent.includeGlobalMemory }
+      : {}),
+    ...(payload.intent?.includedGlobalMemoryIds !== undefined
+      ? { includedGlobalMemoryIds: payload.intent.includedGlobalMemoryIds }
       : {}),
     ...(payload.intent?.inputOrigin ? { inputOrigin: payload.intent.inputOrigin } : {}),
     ...(payload.intent?.conversationQuotes

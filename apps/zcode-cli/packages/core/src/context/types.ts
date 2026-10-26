@@ -12,6 +12,7 @@ import type {
   UserInstructionsOptions,
 } from "@zcode/contracts";
 import type { AutoCompactPolicyConfig } from "../compact/index.js";
+import type { GlobalMemoryEntryInjection } from "../memory/global-content.js";
 import type { AgentProfile } from "../subagent/profile.js";
 
 export type {
@@ -112,12 +113,13 @@ export interface ContextBuilderConfig {
   projectContext?: ProjectContext;
   memoryRoot?: string;
   memoryIndexContent?: string;
-  /** 全局（跨工作区）记忆单文件路径；在场即代表全局记忆总开关已开启。 */
-  globalMemoryFile?: string;
-  /** 全局记忆内容（已按 2048 字符截断）；可为空串。 */
-  globalMemoryContent?: string;
-  /** 仅当前 Turn 用户显式 opt-in 时注入；总开关开但本轮未选择时为 false，默认不注入。 */
-  globalMemoryIncluded?: boolean;
+  /** 全局（跨工作区）记忆目录路径；在场即代表全局记忆总开关已开启。 */
+  globalMemoryDir?: string;
+  /**
+   * 本轮用户选中注入的全局记忆条目（已按单文件 2048 字符截断）。
+   * 空数组或缺省 = 本轮不注入；与总开关解耦——开关开但未选择时不注入。
+   */
+  globalMemories?: readonly GlobalMemoryEntryInjection[];
   skills?: SkillLoadOutcome;
   agentProfiles?: readonly AgentProfile[];
   embeddedSearchEnabled?: boolean;

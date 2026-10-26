@@ -25,28 +25,35 @@ export async function updateTodos(
   db: DatabaseSync,
   input: { sessionID: SessionId; todos: TodoItem[] },
 ): Promise<void> {
-  const now = Date.now();
-
   db.exec("begin immediate");
   try {
-    db.prepare("delete from todo where session_id = ?").run(input.sessionID);
-    if (input.todos.length > 0) {
-      const insert = db.prepare(
-        `
-        insert into todo (
-          session_id, content, status, priority, position, time_created, time_updated
-        ) values (?, ?, ?, ?, ?, ?, ?)
-        `,
-      );
-
-      for (const [position, todo] of input.todos.entries()) {
-        insert.run(input.sessionID, todo.content, todo.status, todo.priority, position, now, now);
-      }
-    }
-    touchSession(db, input.sessionID, now);
+    replaceTodos(db, input);
     db.exec("commit");
   } catch (error) {
     db.exec("rollback");
     throw error;
   }
+}
+
+/** 事务内替换：调用方必须已经持有 BEGIN，本函数不再自行提交。 */
+export function replaceTodos(
+  db: DatabaseSync,
+  input: { sessionID: SessionId; todos: TodoItem[] },
+): void {
+  const now = Date.now();
+  db.prepare("delete from todo where session_id = ?").run(input.sessionID);
+  if (input.todos.length > 0) {
+    const insert = db.prepare(
+      `
+      insert into todo (
+        session_id, content, status, priority, position, time_created, time_updated
+      ) values (?, ?, ?, ?, ?, ?, ?)
+      `,
+    );
+
+    for (const [position, todo] of input.todos.entries()) {
+      insert.run(input.sessionID, todo.content, todo.status, todo.priority, position, now, now);
+    }
+  }
+  touchSession(db, input.sessionID, now);
 }

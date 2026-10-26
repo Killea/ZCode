@@ -64,6 +64,14 @@ function isTruthyRuntimeEnvOverride(name: string): boolean {
 export const runtimeApplicationName =
   readRuntimeEnvOverride("ZCODE_DESKTOP_APPLICATION_NAME") ??
   (isLocalDevelopmentRuntime ? "ZCode Dev" : isPreviewPackagedRuntime ? "ZCode Preview" : "ZCode");
+// Linux 桌面集成标识：app.setDesktopName 会把它写入 CHROME_DESKTOP，作为 Wayland app_id
+// 与 X11 WM_CLASS。必须与安装的 .desktop 文件名（去掉后缀）一致，GNOME/Ubuntu Dock
+// 才能把运行窗口归到启动器并显示运行点。
+export const runtimeDesktopName = isLocalDevelopmentRuntime
+  ? "zcode-dev"
+  : isPreviewPackagedRuntime
+    ? "zcode-preview"
+    : "zcode";
 // Electron 的 app.getPath("home") 不一定跟随测试进程里的 HOME 覆盖。
 // e2e 默认工作区依赖 home 路径，因此提供显式覆盖，避免测试写到开发者真实 ~/ZCodeProject。
 export const runtimeHomePath = readRuntimeEnvOverride("ZCODE_DESKTOP_HOME_DIR");

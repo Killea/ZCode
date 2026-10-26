@@ -19,6 +19,16 @@ describe("electron-builder Linux 打包目标", () => {
     expect(targets).toContain("pacman");
   });
 
+  it("StartupWMClass 与 Electron 运行时桌面标识一致", () => {
+    // Wayland 靠 app_id 匹配 desktop 文件名；X11 靠 StartupWMClass。两者都必须
+    // 与 app.setDesktopName(runtimeDesktopName) 的值一致，否则 Dock 不显示运行点。
+    const identity = resolveDesktopProductIdentity();
+
+    expect(desktopBuilderConfig.linux?.desktop?.entry?.StartupWMClass).toBe(
+      identity.linuxExecutableName,
+    );
+  });
+
   it("rpm 与 deb 的 packageName 按 flavor 拆分且保持一致", () => {
     // 生产版与 Preview 必须是两个独立系统包：rpm 若复用默认包名，
     // dnf 会把另一 flavor 的安装当成升级替换，与 deb 的 packageName 约束对齐。

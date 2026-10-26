@@ -971,18 +971,35 @@ describe("desktopRuntimeEnv runtime identity", () => {
     const {
       isPreviewPackagedRuntime,
       runtimeApplicationName,
+      runtimeDesktopName,
       runtimeSessionDataPath,
       runtimeUserDataPath,
     } = await import("../src/main/desktopRuntimeEnv.js");
 
     expect(isPreviewPackagedRuntime).toBe(true);
     expect(runtimeApplicationName).toBe("ZCode Preview");
+    // Wayland app_id / X11 WM_CLASS 必须与 zcode-preview.desktop 的文件名一致。
+    expect(runtimeDesktopName).toBe("zcode-preview");
     // Bugfix：这两条路径由实现用宿主 path.join 从 app.getPath("appData") 拼出，
     // Windows 上是 `\mock\appData\ZCode Preview`，写死 POSIX 字面量必然失败。
     // 用例要断言的是「Preview 单独占一个 Electron 数据目录」的目录结构，与分隔符无关，
     // 所以用同样的 join 表达；在 POSIX 上是恒等变换。
     expect(runtimeUserDataPath).toBe(join("/mock/appData", "ZCode Preview"));
     expect(runtimeSessionDataPath).toBe(join("/mock/appData", "ZCode Preview", "session"));
+  });
+
+  it("打包 production 使用 zcode 桌面标识，开发态使用 zcode-dev", async () => {
+    appMock.isPackaged = true;
+    productFlavorMock.value = "production";
+
+    const packaged = await import("../src/main/desktopRuntimeEnv.js");
+    expect(packaged.runtimeDesktopName).toBe("zcode");
+
+    vi.resetModules();
+    productFlavorMock.value = "preview";
+    appMock.isPackaged = false;
+    const development = await import("../src/main/desktopRuntimeEnv.js");
+    expect(development.runtimeDesktopName).toBe("zcode-dev");
   });
 
   it("e2e 可保留 Chromedriver 注入的 Electron userData 目录", async () => {

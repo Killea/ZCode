@@ -28,6 +28,8 @@ export function mergeWorkspaceTaskListItemsWithOptimistic(params: {
   activeTaskId: string | null;
   sortBy: WorkspaceTaskListSortBy;
   visibleLimit: number | null;
+  /** workspace 查询的置顶成员 entityKey 集：排序后稳定分区到最前，并在窗口截断前生效。 */
+  pinnedTaskKeys?: ReadonlySet<string>;
 }): ZCodeTaskMeta[] {
   const taskByKey = new Map(params.items.map((task) => [buildTaskEntityKey(task), task] as const));
 
@@ -58,7 +60,15 @@ export function mergeWorkspaceTaskListItemsWithOptimistic(params: {
   const sortedItems = [...taskByKey.values()].sort((left, right) =>
     compareZCodeTaskListItems(left, right, params.sortBy),
   );
-  return params.visibleLimit === null ? sortedItems : sortedItems.slice(0, params.visibleLimit);
+  // 项目内置顶：合并重排会打散缓存的 pinned-first 顺序，这里幂等恢复分区；
+  // 截断在分区之后，置顶行不会被"显示更多"折叠。
+  const orderedItems = params.pinnedTaskKeys?.size
+    ? [
+        ...sortedItems.filter((task) => params.pinnedTaskKeys!.has(buildTaskEntityKey(task))),
+        ...sortedItems.filter((task) => !params.pinnedTaskKeys!.has(buildTaskEntityKey(task))),
+      ]
+    : sortedItems;
+  return params.visibleLimit === null ? orderedItems : orderedItems.slice(0, params.visibleLimit);
 }
 
 export function useWorkspaceTaskOptimisticOverlayByWorkspaceKey(

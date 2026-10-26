@@ -36,6 +36,14 @@ export function buildPersistedConversationInputIntent(
     ...(intent.modelSelection ? { modelSelection: intent.modelSelection } : {}),
     ...(intent.mode ? { mode: intent.mode } : {}),
     ...(intent.planEnabled !== undefined ? { planEnabled: intent.planEnabled } : {}),
+    ...(intent.includeGlobalMemory !== undefined
+      ? { includeGlobalMemory: intent.includeGlobalMemory }
+      : {}),
+    // 本轮全局记忆选择随 intent 持久化：edit/retry 经 canonical 复用同一选择，
+    // 与 modelSelection/planEnabled 的固化语义一致。
+    ...(intent.includedGlobalMemoryIds !== undefined
+      ? { includedGlobalMemoryIds: [...intent.includedGlobalMemoryIds] }
+      : {}),
     ...(intent.sharedContextRefs ? { sharedContextRefs: intent.sharedContextRefs } : {}),
     delivery: {
       requested: intent.requestedDelivery,

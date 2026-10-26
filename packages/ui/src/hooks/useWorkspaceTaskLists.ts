@@ -72,6 +72,8 @@ interface WorkspaceTaskListGroupResult {
   total: number;
   hasMore: boolean;
   unreadTaskKeys: string[];
+  /** 分页前完整置顶成员（entityKey）；workspace 缓存/展示分组的项目内置顶依据。 */
+  pinnedTaskKeys: string[];
 }
 
 interface WorkspaceTaskListRefreshFlight {
@@ -128,11 +130,13 @@ async function buildWorkspaceGroupsFromSessions(params: {
     const scopeTaskIndexItems = taskIndexItems.filter(
       (task) => buildTaskWorkspaceKey(task.workspacePath, task.workspaceIdentity) === scopeKey,
     );
-    // "workspace" 视图规则 = !pinned && !archived，与 "timeline" 同（matchesTaskMembership）。
+    // "workspace" 视图规则 = !archived（"active" 归属，含 pinned）——项目内置顶：
+    // 置顶任务留在各自项目列表内。下方再按 pinnedIds 稳定分区到列表最前；分区
+    // 在调用方的 visibleLimit 截断之前完成，保证置顶行不被"显示更多"折叠。
     const result = buildTaskListResult({
       taskIndexItems: scopeTaskIndexItems,
       sessions: scopeSessions,
-      kind: "timeline",
+      kind: "active",
       pinnedIds,
       archivedIds,
       deletedIds,
@@ -142,17 +146,23 @@ async function buildWorkspaceGroupsFromSessions(params: {
       cronAutomationIdByTaskId,
       sortBy: params.sortBy,
     });
+    const pinnedItems = result.items.filter((task) => pinnedIds.has(task.taskId));
+    const regularItems = result.items.filter((task) => !pinnedIds.has(task.taskId));
+    const items = [...pinnedItems, ...regularItems];
     map.set(scopeKey, {
       workspacePath: scope.workspacePath,
       ...(scope.workspaceIdentity ? { workspaceIdentity: scope.workspaceIdentity } : {}),
-      items: result.items,
+      items,
       total: result.total,
       hasMore: false,
       // workspace task 会先分页再进入 query cache；若只检查可见 items，
       // 收起行会漏掉分页窗口之外的未读。这里在完整 regular-task 结果上先固化成员 key。
-      unreadTaskKeys: result.items
+      unreadTaskKeys: items
         .filter((task) => typeof task.unreadAt === "number")
         .map((task) => buildTaskEntityKey(task)),
+      // 置顶成员 key 与 unreadTaskKeys 同款固化在分页前全集上：
+      // 徽标与 pinned-first 分区不随"显示更多"窗口漂移。
+      pinnedTaskKeys: pinnedItems.map((task) => buildTaskEntityKey(task)),
     });
   }
   return map;
@@ -546,6 +556,7 @@ export function useWorkspaceTaskLists(params: {
                 total: 0,
                 hasMore: false,
                 unreadTaskKeys: [],
+                pinnedTaskKeys: [],
               };
               const visibleItems = group.items.slice(0, config.visibleLimit);
               return {
@@ -555,6 +566,7 @@ export function useWorkspaceTaskLists(params: {
                 total: group.total,
                 hasMore: group.total > visibleItems.length,
                 unreadTaskKeys: group.unreadTaskKeys,
+                pinnedTaskKeys: group.pinnedTaskKeys,
                 expectedInvalidationVersion: expectedInvalidationVersionByQueryKey.get(
                   config.queryKey,
                 ),

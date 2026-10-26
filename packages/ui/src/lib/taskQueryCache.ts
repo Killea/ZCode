@@ -23,6 +23,8 @@ export interface CachedTaskListResult {
   taskKeys: TaskEntityKey[];
   /** workspace 分页前的完整未读成员；其它列表查询可省略。 */
   unreadTaskKeys?: TaskEntityKey[];
+  /** workspace 分页前的完整置顶成员；项目内置顶徽标与分区排序的依据，其它列表查询省略。 */
+  pinnedTaskKeys?: TaskEntityKey[];
   searchSnippetsByTaskKey?: Record<TaskEntityKey, string>;
   searchSnippetListsByTaskKey?: Record<TaskEntityKey, string[]>;
   total: number;

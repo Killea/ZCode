@@ -10,7 +10,6 @@ import {
   TID_MODEL_PROVIDER_API_KEY_INPUT,
   TID_MODEL_PROVIDER_BASE_URL_INPUT,
   TID_MODEL_PROVIDER_MODEL_DELETE_BUTTON,
-  TID_MODEL_PROVIDER_NAME_EDIT_BUTTON,
   TID_MODEL_PROVIDER_NAME_INPUT,
   testId,
 } from "@zcode/shared";
@@ -696,8 +695,6 @@ describe("ProviderModelsSection compact model rows", () => {
         nameEditable: true,
       }),
     );
-    fireEvent.keyDown(screen.getByTestId("model-provider-actions-button"), { key: "Enter" });
-    fireEvent.click(screen.getByTestId(TID_MODEL_PROVIDER_NAME_EDIT_BUTTON));
     const nameInput = screen.getByTestId(TID_MODEL_PROVIDER_NAME_INPUT);
     fireEvent.compositionStart(nameInput);
     fireEvent.change(nameInput, {
@@ -723,8 +720,6 @@ describe("ProviderModelsSection compact model rows", () => {
     const view = render(
       createElement(InlineEditableProviderCard, { provider: createProvider(), onSave }),
     );
-    fireEvent.keyDown(screen.getByTestId("model-provider-actions-button"), { key: "Enter" });
-    fireEvent.click(screen.getByTestId(TID_MODEL_PROVIDER_NAME_EDIT_BUTTON));
     const input = screen.getByTestId(TID_MODEL_PROVIDER_NAME_INPUT);
     fireEvent.change(input, { target: { value: "Cancelled" } });
     fireEvent.change(screen.getByTestId(TID_MODEL_PROVIDER_API_KEY_INPUT), {
@@ -745,15 +740,13 @@ describe("ProviderModelsSection compact model rows", () => {
     expect(onSave).toHaveBeenCalledTimes(1);
   });
 
-  it("名称正式 Enter 只确认一次，标题空白和更多菜单不切换启停", async () => {
+  it("名称 Enter 只确认一次，标题空白不切换启停", async () => {
     const onSave = vi.fn(async () => undefined);
     render(createElement(InlineEditableProviderCard, { provider: createProvider(), onSave }));
     const toggle = screen.getByTestId("model-provider-enabled-switch");
     expect(toggle.closest("label")).toBeNull();
     fireEvent.click(screen.getByTestId("model-provider-header"));
-    fireEvent.keyDown(screen.getByTestId("model-provider-actions-button"), { key: "Enter" });
     expect(onSave).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId(TID_MODEL_PROVIDER_NAME_EDIT_BUTTON));
     const input = screen.getByTestId(TID_MODEL_PROVIDER_NAME_INPUT);
     input.focus();
     fireEvent.change(input, { target: { value: "Confirmed" } });
@@ -804,8 +797,6 @@ describe("ProviderModelsSection compact model rows", () => {
     const view = renderWithProviderFeedback(
       createElement(InlineEditableProviderCard, { provider, onSave }),
     );
-    fireEvent.keyDown(screen.getByTestId("model-provider-actions-button"), { key: "Enter" });
-    fireEvent.click(screen.getByTestId(TID_MODEL_PROVIDER_NAME_EDIT_BUTTON));
     const input = screen.getByTestId(TID_MODEL_PROVIDER_NAME_INPUT);
     fireEvent.change(input, { target: { value: "Retry name" } });
     fireEvent.blur(input);
@@ -813,8 +804,6 @@ describe("ProviderModelsSection compact model rows", () => {
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
     expect(onSave.mock.calls[0]?.[0]).toEqual(onSave.mock.calls[1]?.[0]);
-    fireEvent.keyDown(screen.getByTestId("model-provider-actions-button"), { key: "Enter" });
-    fireEvent.click(screen.getByTestId(TID_MODEL_PROVIDER_NAME_EDIT_BUTTON));
     fireEvent.change(screen.getByTestId(TID_MODEL_PROVIDER_NAME_INPUT), {
       target: { value: "Discard on switch" },
     });
@@ -828,7 +817,9 @@ describe("ProviderModelsSection compact model rows", () => {
         }),
       ),
     );
-    expect(screen.queryByTestId(TID_MODEL_PROVIDER_NAME_INPUT)).toBeNull();
+    expect((screen.getByTestId(TID_MODEL_PROVIDER_NAME_INPUT) as HTMLInputElement).value).toBe(
+      "Other",
+    );
     view.unmount();
     expect(onSave).toHaveBeenCalledTimes(2);
   });
@@ -920,7 +911,7 @@ describe("ProviderModelsSection compact model rows", () => {
     expect(screen.getByText("Anthropic Messages (/v1/messages)")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Base URL（只读）" })).toBeTruthy();
     expect(screen.getByRole("img", { name: "API 格式（只读）" })).toBeTruthy();
-    expect(screen.queryByTestId("model-provider-name-edit-button")).toBeNull();
+    expect(screen.queryByTestId(TID_MODEL_PROVIDER_NAME_INPUT)).toBeNull();
     expect(screen.queryByTestId("model-provider-actions-button")).toBeNull();
     expect(screen.getByTestId(TID_MODEL_PROVIDER_API_KEY_INPUT)).toBeTruthy();
     expect(screen.getByText("deepseek-v4-flash")).toBeTruthy();

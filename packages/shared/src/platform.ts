@@ -24,6 +24,21 @@ import type {
   WebRemoteControlWorkspaceTarget,
 } from "./web-remote-control.js";
 import type { AppSettings, Locale } from "./protocol.js";
+import type {
+  SessionSharingClosePeerRequest,
+  SessionSharingConnectPeerRequest,
+  SessionSharingConnectPeerResponse,
+  SessionSharingDisconnectPeerRequest,
+  SessionSharingImportPeerSessionRequest,
+  SessionSharingImportPeerSessionResponse,
+  SessionSharingListPeerSessionsRequest,
+  SessionSharingListSessionsResponse,
+  SessionSharingLogEntry,
+  SessionSharingPreviewPeerSessionRequest,
+  SessionSharingPreviewResponse,
+  SessionSharingStartRequest,
+  SessionSharingStatus,
+} from "./session-sharing.js";
 import type { ArmsCustomEventPayload, RendererTelemetryEventPayload } from "./telemetry.js";
 import type {
   RendererActionTraceBatchV1,
@@ -755,6 +770,52 @@ export interface IPlatformService {
 
   /** 订阅当前窗口 Web 远程控制状态变化；旧平台可不实现，UI 会保留轮询兜底 */
   onWebRemoteControlStatusChanged?(handler: (status: WebRemoteControlStatus) => void): () => void;
+
+  /** 本机会话共享：启动局域网只读服务；仅 Desktop 本地实现。 */
+  startSessionSharing?(options?: SessionSharingStartRequest): Promise<SessionSharingStatus>;
+
+  /** 本机会话共享：停止服务并断开所有 peer。 */
+  stopSessionSharing?(): Promise<SessionSharingStatus>;
+
+  /** 本机会话共享：查询服务状态。 */
+  getSessionSharingStatus?(): Promise<SessionSharingStatus>;
+
+  /** 本机会话共享：刷新连接码；已签发 token 不受影响。 */
+  refreshSessionSharingCode?(): Promise<SessionSharingStatus>;
+
+  /** 本机会话共享：读取内存日志。 */
+  getSessionSharingLogs?(): Promise<SessionSharingLogEntry[]>;
+
+  /** 本机会话共享：断开指定来源设备。 */
+  disconnectSessionSharingPeer?(
+    request: SessionSharingDisconnectPeerRequest,
+  ): Promise<SessionSharingStatus>;
+
+  /** 本机会话共享：订阅状态变化。 */
+  onSessionSharingStatusChanged?(handler: (status: SessionSharingStatus) => void): () => void;
+
+  /** 目标端：连接另一台 ZCode 的共享服务并列出会话。 */
+  connectSessionSharingPeer?(
+    request: SessionSharingConnectPeerRequest,
+  ): Promise<SessionSharingConnectPeerResponse>;
+
+  /** 目标端：刷新 peer 的会话列表。 */
+  listSessionSharingPeerSessions?(
+    request: SessionSharingListPeerSessionsRequest,
+  ): Promise<SessionSharingListSessionsResponse>;
+
+  /** 目标端：读取最近消息预览。 */
+  previewSessionSharingPeerSession?(
+    request: SessionSharingPreviewPeerSessionRequest,
+  ): Promise<SessionSharingPreviewResponse>;
+
+  /** 目标端：导入 peer 会话到本地工作区。 */
+  importSessionSharingPeerSession?(
+    request: SessionSharingImportPeerSessionRequest,
+  ): Promise<SessionSharingImportPeerSessionResponse>;
+
+  /** 目标端：关闭 peer 连接并清空内存 token。 */
+  closeSessionSharingPeer?(request: SessionSharingClosePeerRequest): Promise<void>;
 
   /** 释放当前窗口里已创建的远程 session */
   disposeRemoteSession(sessionId: string): Promise<void>;

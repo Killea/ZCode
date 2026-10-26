@@ -1620,6 +1620,46 @@ describe("ConversationRowView user query editing", () => {
     });
   });
 
+  it("renders carried global memory as a chip from the user row metadata", async () => {
+    const row = userInputRow({
+      attachments: [],
+      includedGlobalMemoryIds: ["default", "code-style"],
+    });
+    const container = installMinimalDom();
+    const root: Root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        createElement(
+          ZCodeIntlProvider,
+          { initialLocale: "zh-CN" },
+          createElement(ConversationRowView, { context: rowContext, row }),
+        ),
+      );
+    });
+
+    const attachmentArea = findElementByAttribute(
+      container,
+      "data-v4-user-input-attachments",
+      "true",
+    );
+    const pillRow = findElementByAttribute(
+      attachmentArea,
+      "data-v4-user-input-attachment-pills",
+      "true",
+    );
+    const memoryChip = findElementByAttribute(pillRow, "data-global-memory-count", "2");
+    expect(memoryChip).not.toBeNull();
+    expect(collectText(memoryChip)).toContain("携带全局记忆");
+    // 无 ServiceProvider 时名字按 id 回退；default 使用本地化默认名。
+    expect(collectText(container)).toContain("默认");
+    expect(collectText(container)).toContain("code-style");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
   it("renders web element contexts as read-only chips while keeping the raw row text for actions", async () => {
     const context: WebElementContextComposerAttachment = {
       capturedAt: 1_700_000_000_000,

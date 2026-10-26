@@ -258,12 +258,13 @@ export interface AgentRuntimeCoreMethods {
     memoryRoot?: string,
     options?: {
       memoryIndexContent?: string;
-      globalMemoryFile?: string;
-      globalMemoryContent?: string;
+      globalMemoryDir?: string;
       model?: Model;
       persistEnvInfo?: boolean;
     },
   ): ContextBuilder;
+  resolveGlobalMemoryDirOnce(): string | undefined;
+  loadTurnGlobalMemories(): Promise<void>;
   loadProjectMemoryRoot(traceContext: TraceContext): Promise<string | undefined>;
   logMemorySkipped(
     traceContext: TraceContext,

@@ -186,6 +186,30 @@ describe("ProductProjection 黄金测试（L1）", () => {
     expect(conversationSnapshotSchema.parse(snapshot).rows.window).toEqual(snapshot.rows.window);
   });
 
+  it("live TurnStarted 把本轮全局记忆选择投影到 userInput row", () => {
+    const log = new EventLog();
+    log.push(SessionEventType.SessionCreated, { mode: "default", contextWindow: 200_000 });
+    log.push(
+      SessionEventType.TurnStarted,
+      {
+        turnNumber: 1,
+        input: "use memory",
+        inputId: "command-memory",
+        messageId: "user-memory",
+        intent: { includedGlobalMemoryIds: ["default", "code-style"] },
+      },
+      { turnId: "turn-memory" },
+    );
+
+    const userRow = runAll(log.events)
+      .projection.getSnapshot()
+      .rows.window.find((row) => row.kind === "userInput");
+    expect(userRow).toMatchObject({
+      sourceCommandId: "command-memory",
+      includedGlobalMemoryIds: ["default", "code-style"],
+    });
+  });
+
   it("Highspeed turn 终态持久化 CLI 聚合的模型/工具真实耗时", () => {
     const log = new EventLog();
     const turnId = "turn-highspeed-timing";

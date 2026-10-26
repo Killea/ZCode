@@ -79,6 +79,12 @@ export const conversationInputIntentSchema = z
     mode: submissionModeSchema.optional(),
     planEnabled: z.boolean().optional(),
     includeGlobalMemory: z.boolean().optional(),
+    // 与 sendText payload 同名同语义：ids 权威，缺省时 bool true 兼容映射 ["default"]。
+    // queue 持久化与 promotion 透传依赖此字段在场。
+    includedGlobalMemoryIds: z
+      .array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/))
+      .max(4)
+      .optional(),
     sharedContextRefs: z.array(sharedContextRefSchema).max(1).optional(),
     delivery: conversationInputDeliverySchema,
     order: conversationInputOrderSchema,

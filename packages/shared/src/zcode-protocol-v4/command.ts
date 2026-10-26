@@ -114,6 +114,12 @@ export const commandPayloadSchemas = {
       // 逐条 opt-in：本次用户消息是否携带全局（跨工作区）记忆。默认缺省（不携带），
       // 即使全局记忆总开关开启，也只有显式为 true 的那一轮才注入。仅当前 Turn 生效。
       includeGlobalMemory: z.boolean().optional(),
+      // 本轮选中的全局记忆 id（"default" 或 slug），有序、最多 4 条。ids 权威：
+      // 显式提供（含空数组）时覆盖上面的 bool；缺省时 bool true 兼容映射 ["default"]。
+      includedGlobalMemoryIds: z
+        .array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/))
+        .max(4)
+        .optional(),
       // 本次执行仍使用上面的标准 Selection；这里只携带不持久化语义、动态鉴权和 child 策略。
       // 仅 idle startNow 接受，防止 Secret/Ticket 进入普通 CommandInbox。
       modelExecution: modelExecutionSchema.optional(),

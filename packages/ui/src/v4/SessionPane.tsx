@@ -172,6 +172,7 @@ import type { ConversationDropTargetController } from "@/v4/composer/conversatio
 import { shouldIgnoreEscapeForStopGeneration } from "@/v4/composer/escapeStop.js";
 import { ConversationDraftEmptyState } from "@/v4/ConversationDraftEmptyState.js";
 import { ConversationDraftSuggestedPromptsContainer } from "@/v4/ConversationDraftSuggestedPromptsContainer.js";
+import { SessionSharingPanel } from "@/session-sharing/SessionSharingPanel.js";
 import { ConversationHeader, type PaneWorkspaceBadge } from "@/v4/ConversationHeader.js";
 import { ConversationQueuePanel } from "@/v4/ConversationQueuePanel.js";
 import { projectPendingGuideQueue } from "@/v4/pendingGuideProjection.js";
@@ -3247,8 +3248,13 @@ export function SessionPane({
       let submission = options?.submission ?? null;
       // 逐条 opt-in：把 composer 的"本次消息携带全局记忆"意图冻结进本次 submission；
       // 后续各 payload 站点（sendText / createSession firstInput）经 ...submission 统一携带，
-      // 避免逐处透传。缺省/ false 时不写入，保持默认不携带。
-      if (options?.includeGlobalMemory === true && submission) {
+      // 避免逐处透传。ids 权威：非空时覆盖 bool；缺省/ false 时不写入，保持默认不携带。
+      if (options?.includedGlobalMemoryIds?.length && submission) {
+        submission = {
+          ...submission,
+          includedGlobalMemoryIds: [...options.includedGlobalMemoryIds],
+        };
+      } else if (options?.includeGlobalMemory === true && submission) {
         submission = { ...submission, includeGlobalMemory: true };
       }
       const heldQueueDisposition = options?.heldQueueDisposition;
@@ -5394,6 +5400,13 @@ export function SessionPane({
           remoteSessionId={remoteSessionId ?? undefined}
           isWebRemoteControl={compactForRemoteControl}
           isDesktop={isDesktop}
+        />
+      ) : null}
+      {isDraft && isDesktop && !compactForRemoteControl && !remoteSessionId ? (
+        <SessionSharingPanel
+          className="mt-3"
+          workspacePath={workspacePath}
+          {...(workspaceIdentity ? { workspaceIdentity } : {})}
         />
       ) : null}
     </>

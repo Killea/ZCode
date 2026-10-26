@@ -217,8 +217,23 @@ export {
   IMemoryService,
   PROJECT_MEMORY_FILE_CHANGED_ERROR_CODE,
   PROJECT_MEMORY_PREVIEW_LIMIT_EXCEEDED_ERROR_CODE,
+  GLOBAL_MEMORY_CHARACTER_LIMIT,
+  GLOBAL_MEMORY_CHARACTER_LIMIT_EXCEEDED_ERROR_CODE,
+  GLOBAL_MEMORY_DEFAULT_ID,
+  GLOBAL_MEMORY_DESCRIPTION_CHARACTER_LIMIT,
+  GLOBAL_MEMORY_ID_INVALID_ERROR_CODE,
+  GLOBAL_MEMORY_ID_PATTERN,
+  GLOBAL_MEMORY_NAME_CHARACTER_LIMIT,
+  GLOBAL_MEMORY_NAME_INVALID_ERROR_CODE,
+  GLOBAL_MEMORY_NOT_FOUND_ERROR_CODE,
+  GLOBAL_MEMORY_SELECTION_LIMIT,
 } from "./memory/memory.js";
-export type { ProjectMemoryFileSummary, ProjectMemoryWorkspaceSummary } from "./memory/memory.js";
+export type {
+  GlobalMemoryEntry,
+  GlobalMemoryEntryMeta,
+  ProjectMemoryFileSummary,
+  ProjectMemoryWorkspaceSummary,
+} from "./memory/memory.js";
 
 // OutputStyle service — IOutputStyleService is both a type (interface) and value (descriptor).
 export { IOutputStyleService } from "./output-style/outputStyle.js";

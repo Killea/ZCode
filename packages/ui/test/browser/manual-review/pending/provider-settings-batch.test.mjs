@@ -110,25 +110,16 @@ for (const [width, locale, theme] of [
         await toggle.getAttribute("aria-label"),
         locale === "zh-CN" ? "禁用供应商" : "Disable provider",
       );
-      const rename = async () => {
-        await menu.click();
-        await page.getByTestId("model-provider-name-edit-button").click();
-        const input = page.getByTestId("model-provider-name-input");
-        await page.waitForFunction(
-          () => document.activeElement?.dataset.testid === "model-provider-name-input",
-        );
-        return input;
-      };
-      let input = await rename();
-      await input.fill("Cancelled name");
+      const nameInput = page.getByTestId("model-provider-name-input");
+      await nameInput.waitFor();
+      await nameInput.fill("Cancelled name");
       await page.waitForTimeout(1600);
       assert.equal(mutations.length, 0, "name idle must not save");
-      await input.press("Escape");
+      await nameInput.press("Escape");
       await page.waitForTimeout(1300);
       assert.equal(mutations.length, 0, "cancel must not save later");
-      input = await rename();
-      await input.fill("Confirmed Provider with a deliberately long name");
-      await input.press("Enter");
+      await nameInput.fill("Confirmed Provider with a deliberately long name");
+      await nameInput.press("Enter");
       await page
         .getByTestId("model-provider-header")
         .getByText("Confirmed Provider with a deliberately long name", { exact: true })

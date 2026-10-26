@@ -66,6 +66,10 @@ import {
   startProjectMemoryRecallPrefetch,
 } from "../helpers/project-memory-recall.js";
 import { ACTIVE_PROJECT_MEMORY_RETRIEVAL_BRANCH } from "../../memory/project-memory-retrieval-branch.js";
+import {
+  GLOBAL_MEMORY_DEFAULT_ID,
+  normalizeGlobalMemoryIds,
+} from "../../memory/global-content.js";
 import { scheduleProjectMemoryExtraction } from "../helpers/project-memory-extraction.js";
 import { appendBrowserTurnScreenshot } from "./browser-turn-screenshot.js";
 import { clearBrowserTurnState } from "../../repl/browser-turn-state.js";
@@ -118,10 +122,14 @@ export async function executeTurnCommand(
   const turnId = startReservation?.turnId ?? createTurnId();
   const queryId = options?.queryId ?? (options?.inputId as QueryId | undefined) ?? createQueryId();
   const displayInput = options?.displayInput ?? input;
-  // 全局记忆改为逐条 opt-in：仅本轮用户显式携带（intent.includeGlobalMemory）才注入。
-  // 在任何 await 之前写定本轮事实；后续 context 重建（含首轮初始化）都读这一字段，
+  // 全局记忆改为逐条 opt-in：仅本轮用户显式携带才注入。
+  // 在任何 await 之前写定本轮事实；后续 context 重建（含首轮初始化）都读这份快照，
   // 下一轮开始时按该轮自身的 intent 重新赋值，天然做到"发送一次后自动关闭"。
-  this.turnGlobalMemoryIncluded = options?.intent?.includeGlobalMemory === true;
+  // ids 权威：显式提供（含空数组）时直接采用；缺省时旧 bool true 兼容映射 ["default"]。
+  this.turnSelectedGlobalMemoryIds =
+    normalizeGlobalMemoryIds(options?.intent?.includedGlobalMemoryIds) ??
+    (options?.intent?.includeGlobalMemory === true ? [GLOBAL_MEMORY_DEFAULT_ID] : []);
+  this.turnGlobalMemories = [];
   const turnTraceContext =
     startReservation?.traceContext ??
     createChildTraceContext(options?.traceContext ?? this.rootTraceContext, {
@@ -233,6 +241,9 @@ export async function executeTurnCommand(
         throw coreError;
       }
       let phaseStartedAt = startTurnPhase("context_initialization");
+      // 全局记忆按本轮选择读盘，必须在首个 context build 之前完成；
+      // 无效/已删除的 id 在加载期静默跳过，不阻断 turn。
+      await this.loadTurnGlobalMemories();
       if (this.contextInitialized) {
         // 每个后续 model step 都按该步骤实际持有的 Model 重新投影 Context；
         // Session Selection 只决定未来创建哪个 Model，不能充当执行事实。

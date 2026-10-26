@@ -145,6 +145,11 @@ export const userInputRowSchema = z.object({
   workflowLaunch: workflowLaunchMetaSchema.optional(),
   // 经 turn-steer 注入（guideModeTurnSteer）。
   guided: z.literal(true).optional(),
+  // 本轮显式携带的全局记忆 id（有序）；仅用于历史消息回显，缺省兼容旧快照。
+  includedGlobalMemoryIds: z
+    .array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/))
+    .max(4)
+    .optional(),
   // realUser/guided 必带；系统来源缺省。overlay 收口锚点。
   sourceCommandId: z.string().optional(),
   // edit/retry 会生成新的 sourceCommandId；该字段固定指向 canonical input 根，

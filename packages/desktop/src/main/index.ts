@@ -84,6 +84,8 @@ import {
   HostMessageTypes,
 } from "@zcode/shared";
 import { logger, webRemoteControlRelayLogger } from "./logger.js";
+import { registerSessionSharingIpcHandlers } from "./desktopSessionSharingIpc.js";
+import { SessionSharingService } from "./sessionSharing/sessionSharingService.js";
 import { markMainLaunchAppReady } from "./desktopLaunchMarks.js";
 import { createCuaPipFocusRouter, resolveCuaPipWindowKey } from "./cuaPipFocusRouter.js";
 import { createDesktopTelemetryFetch } from "./desktopTelemetryFetch.js";
@@ -173,6 +175,7 @@ import {
   resolveZCodeEndpointEnvBaseOrigin,
   desktopRuntimeEnv,
   runtimeApplicationName,
+  runtimeDesktopName,
   runtimeHomePath,
   runtimeSessionDataPath,
   runtimeUserDataPath,
@@ -288,6 +291,12 @@ if (!app.isPackaged && process.env.ZCODE_DISABLE_FIXED_REMOTE_DEBUGGING_PORT !==
 }
 
 app.setName(runtimeApplicationName);
+if (process.platform === "linux") {
+  // Electron 41 运行时已支持该 API，但当前 electron.d.ts 尚未声明。不设置时 Chromium
+  // 用 productName（"ZCode Preview"）作为 app_id，与 zcode-preview.desktop 不匹配，
+  // Ubuntu Dock 就无法显示运行点。
+  (app as typeof app & { setDesktopName(name: string): void }).setDesktopName(runtimeDesktopName);
+}
 if (runtimeHomePath) {
   app.setPath("home", runtimeHomePath);
 }
@@ -874,11 +883,18 @@ const rendererActionTraceBroker = createRendererActionTraceBroker({
   logger,
 });
 let disposeRendererActionTraceIpc: (() => void) | undefined;
+let disposeSessionSharingIpc: (() => void) | undefined;
 const armsUserIdentitySync = createArmsUserIdentitySync({
   deviceMid,
   setUser: (user) => armsRum.setConfig("user", user),
 });
 const webRemoteControlAppVersion = ZCODE_VERSION || app.getVersion();
+const sessionSharingService = new SessionSharingService({
+  appVersion: webRemoteControlAppVersion,
+  deviceId: deviceMid,
+  deviceName: hostname(),
+  logger,
+});
 const defaultZCodeEndpointUrls = buildZCodeEndpointUrls(DEFAULT_ZCODE_ENDPOINT_ORIGIN, {
   appVersion: webRemoteControlAppVersion,
 });
@@ -1168,6 +1184,8 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
   stopRemoteUsageArmsPeriodicSampling();
   disposeRendererActionTraceIpc?.();
   disposeRendererActionTraceIpc = undefined;
+  disposeSessionSharingIpc?.();
+  disposeSessionSharingIpc = undefined;
   notifyStabilityAppExit(
     getStabilityLifecycleScene() === "update_install" ? "update_install" : "app_quit",
     logger,
@@ -1206,6 +1224,9 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
     // remote session、attachment 和 transport 都由窗口 Host 持有；这里先清理
     // Main 的请求关联，再由下方每窗口唯一 Host 的 shutdown barrier 释放真实连接与 Agent。
     remoteSessionManager.disposeAllAndWaitForAppShutdown(reason),
+    sessionSharingService.stop("app-quit").catch((error) => {
+      logger.warn(`[app-quit] session sharing stop failed (${reason}):`, error);
+    }),
     ...hostProcesses.map((child, index) =>
       disposeHostProcessAndWait(
         child,
@@ -2473,6 +2494,8 @@ app.whenReady().then(async () => {
     listAvailableDockerContainers,
     listSSHConfigAliases,
   });
+
+  disposeSessionSharingIpc = registerSessionSharingIpcHandlers(sessionSharingService);
 
   // 等待 ARMS 完成 init（含渲染进程注入监听），避免首窗 dom-ready 早于 SDK 注册导致无上报
   await armsInitPromise;

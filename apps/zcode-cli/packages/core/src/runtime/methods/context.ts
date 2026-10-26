@@ -17,7 +17,7 @@ import type {
 import type { AgentRuntimeInternal } from "../internal.js";
 import { ensureMemoryDirectoryExists } from "../../memory/directory.js";
 import { formatProjectMemoryIndexContent } from "../../memory/index-content.js";
-import { formatGlobalMemoryContent } from "../../memory/global-content.js";
+import { readGlobalMemoryEntries } from "../../memory/global-content.js";
 import {
   ACTIVE_PROJECT_MEMORY_RETRIEVAL_BRANCH,
   type ProjectMemoryRetrievalBranch,
@@ -27,7 +27,7 @@ import {
   normalizeReadFileStateMtimeMs,
 } from "../../tool/read-file-state.js";
 import {
-  resolveEnabledGlobalMemoryFile,
+  resolveEnabledGlobalMemoryDir,
   resolveEnabledProjectMemoryRoot,
 } from "../helpers/project-memory.js";
 import { buildContextHistoryEntries } from "./context-history-entries.js";
@@ -81,13 +81,11 @@ export async function ensureContextInitialized(
     this.memoryRoot,
     ACTIVE_PROJECT_MEMORY_RETRIEVAL_BRANCH,
   );
-  this.globalMemoryFile = resolveEnabledGlobalMemoryFile(this.config);
-  this.globalMemoryContent = await loadGlobalMemoryContent(this, this.globalMemoryFile);
+  this.resolveGlobalMemoryDirOnce();
   await ensureGenUiOutputDirectory(this);
   this.contextBuilder = this.createContextBuilderFromSnapshot(snapshot, this.memoryRoot, {
     memoryIndexContent: this.memoryIndexContent,
-    globalMemoryFile: this.globalMemoryFile,
-    globalMemoryContent: this.globalMemoryContent,
+    globalMemoryDir: this.globalMemoryDir ?? undefined,
     model,
   });
   this.initializeMessageHistoryFromContext(this.contextBuilder, traceContext);
@@ -120,8 +118,7 @@ export function createContextBuilderFromSnapshot(
   memoryRoot?: string,
   options: {
     memoryIndexContent?: string;
-    globalMemoryFile?: string;
-    globalMemoryContent?: string;
+    globalMemoryDir?: string;
     model?: Model;
     persistEnvInfo?: boolean;
   } = {},
@@ -157,11 +154,11 @@ export function createContextBuilderFromSnapshot(
     projectContext: snapshot.projectContext,
     memoryIndexContent: options.memoryIndexContent,
     memoryRoot,
-    globalMemoryFile: options.globalMemoryFile,
-    globalMemoryContent: options.globalMemoryContent,
-    // 全局记忆改为逐条 opt-in：读当前 Turn 的 runtime 事实（每轮开始重置），
-    // 首轮 ensureContextInitialized 与后续 rebuildContextPrefix 都会经这里读取。
-    globalMemoryIncluded: this.turnGlobalMemoryIncluded === true,
+    globalMemoryDir: options.globalMemoryDir,
+    // 全局记忆改为逐条 opt-in：读当前 Turn 的 runtime 事实（每轮开始按 intent 冻结、
+    // context_initialization 阶段读盘），首轮 ensureContextInitialized 与后续
+    // rebuildContextPrefix 都经这里读取同一份 turn 快照。
+    globalMemories: this.turnGlobalMemories,
     skills: this.skillLoadOutcome,
     agentProfiles: this.config.subagents?.profiles,
     embeddedSearchEnabled: resolveRuntimeEmbeddedSearchEnabled(this),
@@ -229,20 +226,33 @@ export async function loadProjectMemoryIndexContent(
   }
 }
 
-/** 读取并格式化全局（跨工作区）记忆内容；缺失或不可读时返回 undefined。 */
-async function loadGlobalMemoryContent(
-  runtime: AgentRuntimeInternal,
-  file: string | undefined,
-): Promise<string | undefined> {
-  const fileSystemPort = runtime.fileSystemPort;
-  if (!fileSystemPort || !file) return undefined;
-  try {
-    const read = await fileSystemPort.readTextFile({ path: file });
-    return formatGlobalMemoryContent(read.content) || undefined;
-  } catch {
-    // 全局记忆缺失或不可读时视为未启用（与项目记忆 index 的处理一致）。
-    return undefined;
+/**
+ * 全局记忆目录惰性解析：仅在总开关开启且为主 agent 任务类型时返回路径。
+ * 三元语义——undefined 未解析、null 禁用、string 可用；解析一次后缓存，
+ * ensureContextInitialized 与每轮 loadTurnGlobalMemories 共用同一结论。
+ */
+export function resolveGlobalMemoryDirOnce(this: AgentRuntimeInternal): string | undefined {
+  if (this.globalMemoryDir === undefined) {
+    this.globalMemoryDir = resolveEnabledGlobalMemoryDir(this.config) ?? null;
   }
+  return this.globalMemoryDir ?? undefined;
+}
+
+/**
+ * 按本轮冻结的选择 id 加载全局记忆条目。
+ * 每轮 context_initialization 调用一次：无效/缺失文件静默跳过，
+ * 结果存入 turnGlobalMemories 供本轮全部 context build 复用（turn 快照）。
+ */
+export async function loadTurnGlobalMemories(this: AgentRuntimeInternal): Promise<void> {
+  const ids = this.turnSelectedGlobalMemoryIds;
+  if (!ids || ids.length === 0) {
+    this.turnGlobalMemories = [];
+    return;
+  }
+  const dir = this.resolveGlobalMemoryDirOnce();
+  this.turnGlobalMemories = dir
+    ? await readGlobalMemoryEntries(dir, ids, this.fileSystemPort)
+    : [];
 }
 
 export function logMemorySkipped(

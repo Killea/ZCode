@@ -23,6 +23,7 @@ import { isPluginHostInvocation, runPluginHostCommand } from "./plugin-host-comm
 import { isDwfChildInvocation, runDwfChildCommand } from "./dwf-child-command.js";
 import { runPrompt } from "./prompt-command.js";
 import { runPluginsCommand, type PluginsCommandFlags } from "./plugins-command.js";
+import { runSessionShareCommand } from "./session-share-command.js";
 import { runSkillsCommand } from "./skills-command.js";
 import { runTuiCommand } from "./tui-command.js";
 import {
@@ -305,6 +306,17 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       stdin: ctx.stdin,
       stdout: ctx.stdout,
     });
+  }
+
+  // Desktop 局域网会话共享的内部命令：必须和 __internal-search 一样在 parseArgs 前分流，
+  // 避免内部参数被用户面解析器拒绝。该命令只由 Desktop main 以短生命周期子进程调用。
+  if (ctx.argv[0] === "__session-share") {
+    return runSessionShareCommand(
+      ctx,
+      ctx.argv.slice(1),
+      version,
+      (deps.cwd ?? process.cwd)(),
+    );
   }
 
   if (isPluginHostInvocation(ctx.argv)) {

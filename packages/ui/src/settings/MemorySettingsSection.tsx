@@ -10,11 +10,16 @@ import {
 } from "@/settings/MemorySettingsViewer.js";
 import { SettingsGroupCard, SettingsRow } from "@/settings/SettingsPageParts.js";
 import { SettingsSegmentedTabs } from "@/settings/SettingsSegmentedTabs.js";
-import { GlobalMemoryEditor } from "@/settings/GlobalMemoryEditor.js";
+import { GlobalMemoryManager } from "@/settings/GlobalMemoryManager.js";
 
 type MemoryCatalogService = Pick<
   IMemoryService,
-  "listProjectMemories" | "readGlobalMemoryFile" | "writeGlobalMemoryFile"
+  | "listProjectMemories"
+  | "listGlobalMemories"
+  | "readGlobalMemory"
+  | "writeGlobalMemory"
+  | "createGlobalMemory"
+  | "deleteGlobalMemory"
 >;
 
 function normalizeWorkspaceDisplayName(value: string): string {
@@ -262,10 +267,7 @@ export function MemorySettingsSection({
           </SettingsGroupCard>
 
           <SettingsGroupCard>
-            <GlobalMemoryEditor
-              memoryService={memoryService}
-              disabled={!globalMemoryEnabled}
-            />
+            <GlobalMemoryManager memoryService={memoryService} disabled={!globalMemoryEnabled} />
           </SettingsGroupCard>
         </div>
       )}

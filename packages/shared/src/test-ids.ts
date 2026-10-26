@@ -394,6 +394,16 @@ export const TID_SETTINGS_MEMORY_GLOBAL_SWITCH = "settings-memory-global-switch"
 export const TID_SETTINGS_MEMORY_GLOBAL_EDITOR = "settings-memory-global-editor";
 /** 全局记忆保存按钮 */
 export const TID_SETTINGS_MEMORY_GLOBAL_SAVE = "settings-memory-global-save";
+/** 全局记忆条目列表容器 */
+export const TID_SETTINGS_GLOBAL_MEMORY_LIST = "settings-global-memory-list";
+/** 全局记忆新建表单/按钮 */
+export const TID_SETTINGS_GLOBAL_MEMORY_CREATE = "settings-global-memory-create";
+/** 全局记忆 Prompt 注入说明 info 图标 */
+export const TID_SETTINGS_GLOBAL_MEMORY_PROMPT_INFO = "settings-global-memory-prompt-info";
+/** 全局记忆删除按钮（动态后缀为记忆 id） */
+export const TID_SETTINGS_GLOBAL_MEMORY_DELETE = "settings-global-memory-delete";
+/** Composer 全局记忆多选 picker 触发器 */
+export const TID_V4_COMPOSER_MEMORY_PICKER = "v4-composer-memory-picker";
 /** Memory 设置模块刷新按钮 */
 export const TID_SETTINGS_MEMORY_REFRESH = "settings-memory-refresh";
 /** Memory Workspace Scope 菜单触发器 */
@@ -471,9 +481,7 @@ export const TID_MODEL_PROVIDER_START_PLAN_SWITCH_PREFIX =
 export const TID_MODEL_PROVIDER_CONNECTION_MODE_ITEM = "model-provider-connection-mode-item";
 /** 模型供应商详情 API Key 输入框 */
 export const TID_MODEL_PROVIDER_API_KEY_INPUT = "model-provider-api-key-input";
-/** 模型供应商名称编辑按钮 */
-export const TID_MODEL_PROVIDER_NAME_EDIT_BUTTON = "model-provider-name-edit-button";
-/** 模型供应商名称编辑输入框 */
+/** 模型供应商名称输入框 */
 export const TID_MODEL_PROVIDER_NAME_INPUT = "model-provider-name-input";
 /** 模型供应商 Base URL 输入框 */
 export const TID_MODEL_PROVIDER_BASE_URL_INPUT = "model-provider-base-url-input";

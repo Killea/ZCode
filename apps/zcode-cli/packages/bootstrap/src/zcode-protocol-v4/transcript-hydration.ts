@@ -415,6 +415,14 @@ function inputIntentOfMessage(message: MessageWithParts): TurnInputIntentMetadat
       ...(value.modelSelection ? { modelSelection: value.modelSelection } : {}),
       ...(value.mode ? { mode: value.mode } : {}),
       ...(value.planEnabled !== undefined ? { planEnabled: value.planEnabled } : {}),
+      // 冷恢复必须与 live TurnStarted 同形：漏掉记忆选择会让历史行 chip 消失，
+      // 也会让 edit/retry 丢失原轮的全局记忆注入意图。
+      ...(value.includeGlobalMemory !== undefined
+        ? { includeGlobalMemory: value.includeGlobalMemory }
+        : {}),
+      ...(value.includedGlobalMemoryIds !== undefined
+        ? { includedGlobalMemoryIds: [...value.includedGlobalMemoryIds] }
+        : {}),
       admissionSeq: value.order.admissionSeq,
       admittedAt: value.admittedAt,
       requestedDelivery: value.delivery.requested,

@@ -952,6 +952,40 @@ describe("transcript→event 合成", () => {
     });
   });
 
+  it("cold hydration projects persisted global memory selection onto the user input row", () => {
+    const input = userMessage("u-memory", "use my memories", 1000);
+    input.info.metadata = {
+      conversationInputIntent: {
+        sourceCommandId: "command-memory",
+        queueItemId: "queue-memory",
+        clientId: "desktop-memory",
+        kind: "sendText",
+        text: "use my memories",
+        attachments: [],
+        // 新增选择 + 旧 bool 都要与 live TurnStarted 同形恢复；row 只回显 ids。
+        includeGlobalMemory: true,
+        includedGlobalMemoryIds: ["default", "code-style"],
+        delivery: { requested: "startNow", admitted: "startNow" },
+        order: { admissionSeq: 6 },
+        steer: { state: "notRequested" },
+        dispatch: { state: "drained" },
+        admittedAt: 1000,
+      },
+    };
+
+    const { projection } = reduce([
+      input,
+      assistantMessage("a-memory", "u-memory", "memory applied", 1001),
+    ]);
+
+    expect(
+      projection.getSnapshot().rows.window.find((row) => row.kind === "userInput"),
+    ).toMatchObject({
+      sourceCommandId: "command-memory",
+      includedGlobalMemoryIds: ["default", "code-style"],
+    });
+  });
+
   it("cold retry intent preserves original cause provenance", () => {
     const retried = userMessage("u-retry", "original text", 1000);
     retried.info.metadata = {

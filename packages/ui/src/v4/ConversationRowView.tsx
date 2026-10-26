@@ -136,6 +136,8 @@ import { useOpenPptxElementReference } from "@/v4/composer/useOpenPptxElementRef
 import { ConversationFileRewindDialog } from "@/v4/ConversationFileRewindDialog.js";
 import { BotGroupSourceLabel } from "@/v4/BotGroupSourceLabel.js";
 import { splitUserInputEpilogue } from "@/v4/ConversationUserInputEpilogue.js";
+import { ToolRecommendationChip } from "@/v4/composer/ToolRecommendationChip.js";
+import { GlobalMemoryChip } from "@/v4/composer/GlobalMemoryChip.js";
 import { ConversationHookDetailsAction } from "@/v4/ConversationHookDetailsAction.js";
 import { formatModelChangeLabel } from "@/v4/composer/modelTriggerDisplay.js";
 import { formatMessageTimeLabel } from "@/v4/messageTimeLabel.js";
@@ -996,6 +998,8 @@ const SingleUserInputRowView = memo(function SingleUserInputRowView({
   const webElementContexts = parsedPrompt.webElements;
   const pptxElementReferences = parsedPrompt.pptxElements;
   const conversationSelections = parsedPrompt.conversationSelections;
+  const toolRecommendations = parsedPrompt.toolRecommendations;
+  const includedGlobalMemoryIds = row.includedGlobalMemoryIds ?? [];
   const hasAttachments = (row.attachments?.length ?? 0) > 0;
   const hasMediaAttachments =
     row.attachments?.some(
@@ -1015,14 +1019,19 @@ const SingleUserInputRowView = memo(function SingleUserInputRowView({
     webElementContexts.length > 0 ||
     pptxElementReferences.length > 0 ||
     conversationSelections.length > 0 ||
-    pluginUiContexts.length > 0;
+    pluginUiContexts.length > 0 ||
+    toolRecommendations.length > 0 ||
+    includedGlobalMemoryIds.length > 0;
   const hasAttachmentArea = hasAttachments || hasContextReferences;
   const hasAttachmentPills =
     hasFileAttachments ||
     codeCommentContexts.length > 0 ||
     webElementContexts.length > 0 ||
     pptxElementReferences.length > 0 ||
-    (!row.botGroupSource && conversationSelections.length > 0);
+    (!row.botGroupSource && conversationSelections.length > 0) ||
+    // 工具推荐 chip 同样需要 pill 区域承载（WIP 语义：hasContextReferences 触发 pill）。
+    toolRecommendations.length > 0 ||
+    includedGlobalMemoryIds.length > 0;
   // Bug 根因：旧逻辑只接受 schedule runId，导致用户点击「立即运行」产生的 manual run
   // 没有来源标识。两种合法 automation runId 都应展示；普通会话输入仍因解析失败而不展示。
   const isScheduledAutomationPrompt = parseAutomationRunId(row.sourceCommandId ?? "") !== null;
@@ -1376,6 +1385,8 @@ const SingleUserInputRowView = memo(function SingleUserInputRowView({
                 />
               ) : null}
               <PluginUiModelContextChip contexts={pluginUiContexts} contentAlign="end" />
+              <GlobalMemoryChip memoryIds={includedGlobalMemoryIds} contentAlign="end" />
+              <ToolRecommendationChip recommendations={toolRecommendations} contentAlign="end" />
             </div>
           ) : null}
         </div>

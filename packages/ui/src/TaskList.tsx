@@ -311,8 +311,12 @@ export const TaskList = memo(function TaskList({
       sortBy === "manual"
         ? tasks
         : [...tasks].sort((left, right) => compareZCodeTaskListItems(left, right, sortBy));
-    return orderedTasks;
-  }, [sortBy, tasks]);
+    // 项目内置顶：pinned 成员稳定分在列表最前。上游分组已按 pinned-first 排序，
+    // 这里对非 manual 排序的本地重排与乐观合并窗口再做一次幂等分区兜底。
+    const pinned = orderedTasks.filter((task) => pinnedTaskIdSet.has(task.taskId));
+    const regular = orderedTasks.filter((task) => !pinnedTaskIdSet.has(task.taskId));
+    return [...pinned, ...regular];
+  }, [sortBy, tasks, pinnedTaskIdSet]);
   useEffect(() => {
     if (!pendingArchiveTaskId) {
       return;

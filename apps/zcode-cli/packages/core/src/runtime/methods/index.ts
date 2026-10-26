@@ -78,7 +78,11 @@ import { discardPersistedPendingSteerInputs } from "./steering.js";
 import { createDefaultSubagentPort } from "./subagent.js";
 import { ensureContextInitialized, getSkillCatalog } from "./context.js";
 import { createContextBuilderFromSnapshot } from "./context.js";
-import { loadProjectMemoryRoot } from "./context.js";
+import {
+  loadProjectMemoryRoot,
+  loadTurnGlobalMemories,
+  resolveGlobalMemoryDirOnce,
+} from "./context.js";
 import { logMemorySkipped } from "./context.js";
 import { injectPluginReferenceReminderFromTurn } from "./plugin-reference.js";
 import { initializeMcp, refreshMcpToolsIfChanged } from "./mcp.js";
@@ -282,6 +286,8 @@ export function installAgentRuntimeMethods(ctor: AgentRuntimeConstructor): void 
   proto.getSkillCatalog = getSkillCatalog;
   proto.createContextBuilderFromSnapshot = createContextBuilderFromSnapshot;
   proto.loadProjectMemoryRoot = loadProjectMemoryRoot;
+  proto.loadTurnGlobalMemories = loadTurnGlobalMemories;
+  proto.resolveGlobalMemoryDirOnce = resolveGlobalMemoryDirOnce;
   proto.logMemorySkipped = logMemorySkipped;
   proto.injectPluginReferenceReminderFromTurn = injectPluginReferenceReminderFromTurn;
   proto.initializeMcp = initializeMcp;

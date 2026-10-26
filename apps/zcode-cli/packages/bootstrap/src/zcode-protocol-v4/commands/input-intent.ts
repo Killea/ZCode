@@ -19,6 +19,7 @@ export interface CanonicalCommandIntent {
   mode?: SubmissionMode;
   planEnabled?: boolean;
   includeGlobalMemory?: boolean;
+  includedGlobalMemoryIds?: readonly string[];
   sourceCommandId?: string;
   clientId?: string;
   queueItemId?: string;
@@ -46,6 +47,7 @@ export function inputIntentMetadata(
     mode?: SubmissionMode;
     planEnabled?: boolean;
     includeGlobalMemory?: boolean;
+    includedGlobalMemoryIds?: readonly string[];
     sharedContextRefs?: TurnInputIntentMetadata["sharedContextRefs"];
     source?: TurnInputIntentMetadata["source"];
   },
@@ -76,6 +78,9 @@ export function inputIntentMetadata(
     ...(options.planEnabled !== undefined ? { planEnabled: options.planEnabled } : {}),
     ...(options.includeGlobalMemory !== undefined
       ? { includeGlobalMemory: options.includeGlobalMemory }
+      : {}),
+    ...(options.includedGlobalMemoryIds !== undefined
+      ? { includedGlobalMemoryIds: [...options.includedGlobalMemoryIds] }
       : {}),
     admissionSeq: admission.admissionSeq,
     admittedAt: admission.admittedAt,
@@ -119,6 +124,9 @@ export function inputIntentMetadataFromCanonical(
     ...(canonical.includeGlobalMemory !== undefined
       ? { includeGlobalMemory: canonical.includeGlobalMemory }
       : {}),
+    ...(canonical.includedGlobalMemoryIds !== undefined
+      ? { includedGlobalMemoryIds: [...canonical.includedGlobalMemoryIds] }
+      : {}),
     admissionSeq: admission.admissionSeq,
     admittedAt: admission.admittedAt,
     requestedDelivery: canonical.requestedDelivery ?? "startNow",
@@ -158,6 +166,9 @@ export function inputIntentMetadataFromQueueItem(
     ...(item.planEnabled !== undefined ? { planEnabled: item.planEnabled } : {}),
     ...(item.includeGlobalMemory !== undefined
       ? { includeGlobalMemory: item.includeGlobalMemory }
+      : {}),
+    ...(item.includedGlobalMemoryIds !== undefined
+      ? { includedGlobalMemoryIds: [...item.includedGlobalMemoryIds] }
       : {}),
     admissionSeq: item.order.admissionSeq,
     admittedAt: item.admittedAt,

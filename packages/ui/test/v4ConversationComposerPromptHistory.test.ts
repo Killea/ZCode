@@ -151,6 +151,18 @@ vi.mock("@/v4/composer/useComposerAttachments.js", () => ({
   }),
 }));
 
+// Bug 原因：Composer Tools Picker 给 composer 新增了插件目录服务依赖
+// （usePluginReferenceCatalog 无条件执行，内部要求 ServiceProvider）；
+// 本 harness 按既有模式只 mock 组件级依赖，故同样 mock 空目录，避免渲染即抛错。
+vi.mock("@/hooks/usePluginReferenceCatalog.js", () => ({
+  usePluginReferenceCatalog: () => ({
+    entries: [],
+    authority: null,
+    loading: false,
+    error: null,
+  }),
+}));
+
 vi.mock("@/v4/composer/V4ComposerToolbar.js", async () => {
   const React = await import("react");
   return {
@@ -301,8 +313,7 @@ function renderComposerElement(
   submissionReady = true,
 ) {
   const scopeId = sessionId ?? V4_DRAFT_SCOPE_ROOT;
-  let ownedDraft =
-    composerDraft ??
+  let ownedDraft = composerDraft ??
     readV4ComposerDraft("/workspace", undefined, scopeId) ?? {
       text: "",
       updatedAt: 0,
@@ -596,7 +607,10 @@ describe("ConversationComposer prompt history", () => {
   it("迟到的发送成功不能清除等待期间产生的新正文", async () => {
     let resolveSend!: () => void;
     const onSendText = vi.fn(
-      () => new Promise<void>((resolve) => { resolveSend = resolve; }),
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSend = resolve;
+        }),
     );
     const { root } = renderComposer(onSendText);
     const submit = chatPromptEditorProps.at(-1)!.onSubmit as (text: string) => boolean;

@@ -672,12 +672,11 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebarComponent({
   }, []);
   const shouldShowPinnedTasks =
     !isWebRemoteControlSidebar &&
-    (taskViewMode === "workspace" ||
-      taskViewMode === "timeline" ||
-      taskViewMode === "archived" ||
-      // Bugfix: grouped 主体会主动过滤 pinned task；如果同页不渲染全局置顶区，
-      // 从 Header 置顶当前任务后整条 row 会无处展示，看起来像 session 被删除。
-      taskViewMode === "grouped");
+    // workspace（项目）视图下置顶任务已经显示在各自项目列表顶部，
+    // 全局"已置顶"区只会把多工程任务混到一起——该模式下不渲染。
+    // timeline/archived/grouped 主体仍过滤 pinned task：同页不渲染全局置顶区，
+    // 从 Header 置顶当前任务后整条 row 会无处展示，看起来像 session 被删除。
+    (taskViewMode === "timeline" || taskViewMode === "archived" || taskViewMode === "grouped");
   const workspaceScrollRef = useRef<HTMLDivElement | null>(null);
   const [showWorkspaceTopMask, setShowWorkspaceTopMask] = useState(false);
   const [showWorkspaceBottomMask, setShowWorkspaceBottomMask] = useState(false);
@@ -1796,6 +1795,7 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebarComponent({
                                             taskItems={
                                               taskGroup?.items ?? EMPTY_WORKSPACE_TASK_ITEMS
                                             }
+                                            taskPinnedTaskIds={taskGroup?.pinnedTaskIds}
                                             taskListLoading={taskLoading}
                                             taskListHasMore={taskGroup?.hasMore ?? false}
                                             taskListHasUnread={taskGroup?.hasUnread ?? false}

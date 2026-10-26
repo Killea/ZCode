@@ -86,6 +86,18 @@ vi.mock("@/v4/composer/useComposerAttachments.js", () => ({
   }),
 }));
 
+// Bug 原因：Composer Tools Picker 给 composer 新增了插件目录服务依赖
+// （usePluginReferenceCatalog 无条件执行，内部要求 ServiceProvider）；
+// 本 harness 按既有模式只 mock 组件级依赖，故同样 mock 空目录，避免渲染即抛错。
+vi.mock("@/hooks/usePluginReferenceCatalog.js", () => ({
+  usePluginReferenceCatalog: () => ({
+    entries: [],
+    authority: null,
+    loading: false,
+    error: null,
+  }),
+}));
+
 vi.mock("@/v4/composer/V4ComposerToolbar.js", async () => {
   const React = await import("react");
   const Stub = ({ label }: { label: string }) => React.createElement("span", null, label);

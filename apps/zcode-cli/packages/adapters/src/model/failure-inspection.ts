@@ -264,6 +264,10 @@ export function isNetworkFailure(code?: string): boolean {
   const normalized = code?.toUpperCase();
   return (
     normalized === "ECONNRESET" ||
+    // 服务端关闭空闲 keep-alive 连接后，客户端仍复用该连接写入会得到 EPIPE
+    // （ninfer 默认 Keep-Alive: timeout=5）。此时尚未收到响应，重试会新建连接，
+    // 不能落成不可重试的 unknown。
+    normalized === "EPIPE" ||
     normalized === "ECONNREFUSED" ||
     normalized === "EAI_AGAIN" ||
     normalized === "ENOTFOUND" ||

@@ -790,6 +790,20 @@ export interface SharedContextImportCommitBundle {
   provenance: SessionEntryInfo;
 }
 
+/**
+ * 跨机会话导入的单事务载荷。
+ *
+ * 调用方必须保证 session/message/part/entry 的 ID 与 sessionID 已经完成目标端映射：
+ * 本接口只负责原子写入，不做 ID 重映射或 artifact URI 改写。目标端应为每次导入
+ * 生成新的 session ID，并保留 message/part ID 的内部引用关系。
+ */
+export interface SessionImportCommitBundle {
+  session: CreateSessionInput;
+  messages: MessageWithParts[];
+  entries: SessionEntryInfo[];
+  todos: TodoItem[];
+}
+
 export type SharedContextImportStatus = "pending" | "reserved" | "attached" | "discarded";
 
 export interface SharedContextImportTransition {
@@ -1102,6 +1116,8 @@ export interface SessionStorePort {
   /** V4 stable/compact-edit fork 的唯一事务入口。legacy workspace fork 不调用。 */
   commitForkBundle?(bundle: ForkCommitBundle): Promise<SessionInfo>;
   commitSharedContextImportBundle?(bundle: SharedContextImportCommitBundle): Promise<SessionInfo>;
+  /** 跨机会话导入的唯一事务入口；调用方负责 ID 映射和 artifact 处理。 */
+  commitSessionImportBundle?(bundle: SessionImportCommitBundle): Promise<SessionInfo>;
   transitionSharedContextImport?(input: SharedContextImportTransition): Promise<boolean>;
   updateSession(input: UpdateSessionInput): Promise<SessionInfo>;
   getSession(sessionID: SessionId): Promise<SessionInfo | null>;

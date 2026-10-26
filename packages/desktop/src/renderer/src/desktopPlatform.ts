@@ -37,6 +37,22 @@ export function createDesktopPlatform(options: {
     getWebRemoteControlStatus: () => window.zcode.getWebRemoteControlStatus(),
     onWebRemoteControlStatusChanged: (handler) =>
       window.zcode.onWebRemoteControlStatusChanged?.(handler) ?? (() => {}),
+    startSessionSharing: (options) => window.zcode.startSessionSharing(options),
+    stopSessionSharing: () => window.zcode.stopSessionSharing(),
+    getSessionSharingStatus: () => window.zcode.getSessionSharingStatus(),
+    getSessionSharingLogs: () => window.zcode.getSessionSharingLogs(),
+    refreshSessionSharingCode: () => window.zcode.refreshSessionSharingCode(),
+    disconnectSessionSharingPeer: (request) => window.zcode.disconnectSessionSharingPeer(request),
+    onSessionSharingStatusChanged: (handler) =>
+      window.zcode.onSessionSharingStatusChanged?.(handler) ?? (() => {}),
+    connectSessionSharingPeer: (request) => window.zcode.connectSessionSharingPeer(request),
+    listSessionSharingPeerSessions: (request) =>
+      window.zcode.listSessionSharingPeerSessions(request),
+    previewSessionSharingPeerSession: (request) =>
+      window.zcode.previewSessionSharingPeerSession(request),
+    importSessionSharingPeerSession: (request) =>
+      window.zcode.importSessionSharingPeerSession(request),
+    closeSessionSharingPeer: (request) => window.zcode.closeSessionSharingPeer(request),
     disposeRemoteSession: (sessionId) => window.zcode.disposeRemoteSession(sessionId),
     isDockerAvailable: () => window.zcode.isDockerAvailable(),
     listWSLDistros: () => window.zcode.listWSLDistros(),

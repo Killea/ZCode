@@ -978,6 +978,35 @@ describe("classifyModelFailure provider business codes", () => {
     });
   });
 
+  it("maps provider business EPIPE write failures to retryable network errors", () => {
+    // 本地 ninfer 关闭 5s 空闲 keep-alive 后，客户端复用旧连接写入得到 EPIPE；
+    // 此时请求根本没有进入服务端，必须按网络断连重试而不是 unknown。
+    const failure = classifyModelFailure(
+      new ProviderBusinessError({
+        providerCode: "EPIPE",
+        providerId: "account:local-ninfer",
+        providerKind: "openai-compatible",
+        providerMessage: "Cannot connect to API: write EPIPE",
+        responseBodySummary: {
+          type: "error",
+          error: {
+            name: "AI_APICallError",
+            message: "Cannot connect to API: write EPIPE",
+            cause: { errno: -32, code: "EPIPE", syscall: "write" },
+          },
+        },
+      }),
+    );
+
+    expect(failure).toMatchObject({
+      code: "model_request_failed",
+      message: "Cannot connect to API: write EPIPE",
+      reason: "network_error",
+      retryReason: "network_error",
+      retryable: true,
+    });
+  });
+
   it("maps provider business transport timeouts to retryable timeout failures", () => {
     const cases = [
       {

@@ -161,15 +161,16 @@ export class ContextBuilder {
         }
       }
 
-      // Global memory（跨工作区，独立开关 + 逐条 opt-in）：总开关开启（globalMemoryFile 在场）
-      // 且本轮用户显式选择携带（globalMemoryIncluded）才注入；空内容也展示规则。
-      if (this.config.globalMemoryFile && this.config.globalMemoryIncluded) {
-        sections.push(
-          buildGlobalMemorySection({
-            filePath: this.config.globalMemoryFile,
-            content: this.config.globalMemoryContent ?? "",
-          }),
-        );
+      // Global memory（跨工作区，独立开关 + 逐条 opt-in）：总开关开启（globalMemoryDir 在场）
+      // 且本轮选中条目已加载（globalMemories 非空）才注入；无效 id 在加载期已静默跳过。
+      if (this.config.globalMemoryDir && (this.config.globalMemories?.length ?? 0) > 0) {
+        const globalMemorySection = buildGlobalMemorySection({
+          dir: this.config.globalMemoryDir,
+          memories: this.config.globalMemories ?? [],
+        });
+        if (globalMemorySection) {
+          sections.push(globalMemorySection);
+        }
       }
       sections.push(buildEnvInfoSection(this.config.envInfo, this.config.model));
 

@@ -4,7 +4,6 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
-  type RefObject,
   type ReactNode,
 } from "react";
 import type {
@@ -18,11 +17,10 @@ import {
   TID_MODEL_PROVIDER_BASE_URL_INPUT,
   TID_MODEL_PROVIDER_MODEL_DELETE_BUTTON,
   TID_MODEL_PROVIDER_MODEL_INPUT,
-  TID_MODEL_PROVIDER_NAME_EDIT_BUTTON,
   TID_MODEL_PROVIDER_NAME_INPUT,
   testId,
 } from "@zcode/shared";
-import { InfoIcon, LockKeyholeIcon, Plus, Pencil, Trash2, MoreHorizontal } from "lucide-react";
+import { InfoIcon, LockKeyholeIcon, Plus, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import { Input } from "@/components/ui/input.js";
 import {
@@ -30,7 +28,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useServices } from "@/hooks/useServices.js";
@@ -71,70 +68,30 @@ export function shouldShowProviderApiFormat(
 export function ProviderCardHeader({
   providerName,
   logo,
-  editingName,
-  nameValue,
-  nameInputRef,
-  nameEditable = true,
-  onNameChange,
-  onNameBlur,
-  onNameKeyDown,
-  onNameCompositionEnd,
-  onNameCompositionStart,
-  onStartEditName,
   onDelete,
   actionsVisible = true,
   providerToggle,
 }: {
   providerName: string;
   logo?: ProviderConfigObject["logo"];
-  editingName: boolean;
-  nameValue: string;
-  nameInputRef: RefObject<HTMLInputElement | null>;
-  nameEditable?: boolean;
-  onNameChange: (value: string) => void;
-  onNameBlur: () => void;
-  onNameKeyDown: (event: ReactKeyboardEvent) => void;
-  onNameCompositionEnd?: () => void;
-  onNameCompositionStart?: () => void;
-  onStartEditName: () => void;
   onDelete?: () => void;
   actionsVisible?: boolean;
   providerToggle?: ReactNode;
 }) {
   const { intl } = useZCodeIntl();
-  const renameRequestedRef = useRef(false);
-  const secondaryActionsVisible = actionsVisible && (nameEditable || Boolean(onDelete));
+  const actionsMenuVisible = actionsVisible && Boolean(onDelete);
 
   return (
     <div className="flex items-center justify-between gap-3" data-testid="model-provider-header">
       <div className="flex min-w-0 items-center gap-2">
         <ProviderLogo logo={logo} className="size-5" />
-        {editingName ? (
-          <Input
-            {...TECHNICAL_INPUT_ATTRIBUTES}
-            ref={nameInputRef}
-            data-testid={TID_MODEL_PROVIDER_NAME_INPUT}
-            type="text"
-            size="lg"
-            className="w-auto min-w-0 text-ui-lg font-semibold"
-            value={nameValue}
-            onChange={(event) => onNameChange(event.target.value)}
-            onCompositionEnd={onNameCompositionEnd}
-            onCompositionStart={onNameCompositionStart}
-            onBlur={onNameBlur}
-            onKeyDown={onNameKeyDown}
-          />
-        ) : (
-          <>
-            <div className="min-w-0 truncate text-ui-lg font-semibold text-foreground">
-              {providerName}
-            </div>
-          </>
-        )}
+        <div className="min-w-0 truncate text-ui-lg font-semibold text-foreground">
+          {providerName}
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {providerToggle}
-        {secondaryActionsVisible ? (
+        {actionsMenuVisible ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -147,39 +104,54 @@ export function ProviderCardHeader({
                 <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              onCloseAutoFocus={(event) => {
-                // 重命名后的焦点交给输入框，不能被菜单关闭时重新抢回触发按钮。
-                if (renameRequestedRef.current) {
-                  event.preventDefault();
-                  renameRequestedRef.current = false;
-                }
-              }}
-            >
-              {nameEditable ? (
-                <DropdownMenuItem
-                  data-testid={TID_MODEL_PROVIDER_NAME_EDIT_BUTTON}
-                  onSelect={() => {
-                    renameRequestedRef.current = true;
-                    onStartEditName();
-                  }}
-                >
-                  <Pencil className="size-3.5" />
-                  {intl.formatMessage({ id: "settings.modelProvider.renameProvider" })}
-                </DropdownMenuItem>
-              ) : null}
-              {nameEditable && onDelete ? <DropdownMenuSeparator /> : null}
-              {onDelete ? (
-                <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-                  <Trash2 className="size-3.5" />
-                  {intl.formatMessage({ id: "common.delete" })}
-                </DropdownMenuItem>
-              ) : null}
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                <Trash2 className="size-3.5" />
+                {intl.formatMessage({ id: "common.delete" })}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+export function ProviderNameSection({
+  value,
+  onChange,
+  onBlur,
+  onKeyDown,
+  onCompositionStart,
+  onCompositionEnd,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+  onKeyDown?: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
+  onCompositionStart?: () => void;
+  onCompositionEnd?: () => void;
+}) {
+  const { intl } = useZCodeIntl();
+
+  return (
+    <div>
+      <label className="mb-1 block text-ui-base text-foreground-subtle">
+        {intl.formatMessage({ id: "settings.modelProvider.name" })}
+      </label>
+      <Input
+        {...TECHNICAL_INPUT_ATTRIBUTES}
+        type="text"
+        size="lg"
+        data-testid={TID_MODEL_PROVIDER_NAME_INPUT}
+        value={value}
+        placeholder={intl.formatMessage({ id: "settings.modelProvider.namePlaceholder" })}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
+        onKeyDown={onKeyDown}
+        onCompositionStart={onCompositionStart}
+        onCompositionEnd={onCompositionEnd}
+      />
     </div>
   );
 }

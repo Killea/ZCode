@@ -127,7 +127,11 @@ import {
 } from "@/lib/workspaceFileDrag.js";
 import { appendWorkspaceFileMentionToComposer } from "@/lib/workspaceFileComposer.js";
 import { resolveProviderBaseURL } from "@/lib/registryProviderView.js";
-import type { ModelSelectionView } from "@zcode/services";
+import {
+  GLOBAL_MEMORY_SELECTION_LIMIT,
+  type GlobalMemoryEntryMeta,
+  type ModelSelectionView,
+} from "@zcode/services";
 import type { ModelSelectionState } from "@/hooks/useModelSelectionView.js";
 import type { ZCodeUiError } from "@/lib/zcodeUiError.js";
 import {
@@ -166,7 +170,14 @@ import type { CodeViewerSource } from "@/lib/codeViewer.js";
 import { useConversationSelectionReferences } from "@/v4/composer/useConversationSelectionReferences.js";
 import { ConversationBackgroundWorkTrigger } from "@/v4/composer/ConversationBackgroundWorkTrigger.js";
 import { V4ComposerCuaEntry } from "@/v4/composer/V4ComposerCuaEntry.js";
-import { V4ComposerGlobalMemorySwitch } from "@/v4/composer/V4ComposerGlobalMemorySwitch.js";
+import { V4ComposerMemoryPicker } from "@/v4/composer/V4ComposerMemoryPicker.js";
+import {
+  V4ComposerToolsPicker,
+  selectPickableMcpServers,
+} from "@/v4/composer/V4ComposerToolsPicker.js";
+import { resolveComposerToolRecommendations } from "@/v4/composer/composerToolRecommendations.js";
+import { usePluginReferenceCatalog } from "@/hooks/usePluginReferenceCatalog.js";
+import { useMcpStore } from "@/store/mcpStore.js";
 import {
   V4ComposerRecentPromptsHint,
   type ComposerRecentPromptItem,
@@ -191,6 +202,7 @@ import { buildV4ConversationPromptTelemetryExtraDetail } from "@/v4/telemetry/co
 import { resolveAttachableShareContext } from "@/lib/conversationShareContext.js";
 
 const MODEL_SELECTION_LOADING_STATE: ModelSelectionState = { status: "loading" };
+const EMPTY_TOOL_SELECTION_IDS: ReadonlySet<string> = new Set<string>();
 
 export interface ConversationComposerSendOptions {
   /** 点击发送时复制的配置；null 表示未完成选择，Host 不得从 Session 补齐。 */
@@ -210,6 +222,8 @@ export interface ConversationComposerSendOptions {
   sharedContextRefs?: Array<{ kind: "shared_context_import"; context_id: string }>;
   /** 逐条 opt-in：本次消息是否携带全局（跨工作区）记忆；缺省/ false = 不携带。 */
   includeGlobalMemory?: boolean;
+  /** 本轮选中的全局记忆 id（有序）；空/缺省 = 不携带。ids 权威，覆盖 includeGlobalMemory。 */
+  includedGlobalMemoryIds?: readonly string[];
   /** 插件 UI 代发：随 sendText 持久化，用户消息卡片显示"来自插件 X"。 */
   source?: import("@zcode/shared/zcode-protocol-v4").ConversationInputSource;
 }
@@ -593,9 +607,19 @@ function ConversationComposerImpl({
   const configPickerScopeKey = `${workspaceKey}\0${draftScopeId}`;
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
-  // 逐条 opt-in 的"全局记忆"开关：默认关闭，仅在总开关开启时显示；
+  // 逐条 opt-in 的"全局记忆"选择：默认空集，仅在总开关开启时显示 picker；
   // 发送成功后自动复位（见 submit 的 sent 分支），因此平时不会携带全局记忆。
-  const [globalMemoryOptIn, setGlobalMemoryOptIn] = useState(false);
+  const [globalMemorySelectedIds, setGlobalMemorySelectedIds] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+  // picker 菜单打开时按需拉取记忆清单（authority 服务调用有成本，不随每次渲染发起）。
+  const [globalMemoryEntries, setGlobalMemoryEntries] = useState<readonly GlobalMemoryEntryMeta[]>(
+    [],
+  );
+  const [globalMemoryListState, setGlobalMemoryListState] = useState<{
+    loading: boolean;
+    error: string | null;
+  }>({ loading: false, error: null });
   const [presentedHighspeedCardId, setPresentedHighspeedCardId] = useState<string | null>(null);
   const [highspeedSweepActive, setHighspeedSweepActive] = useState(false);
   const highspeedCardId = highspeedCard?.cardId ?? null;
@@ -622,6 +646,112 @@ function ConversationComposerImpl({
     const timer = window.setTimeout(() => setHighspeedSweepActive(true), 1_900);
     return () => window.clearTimeout(timer);
   }, [highspeedEntranceAnimated, highspeedPresented]);
+  // "MCP & 插件"勾选集：逐条 opt-in（默认空选走默认逻辑），发送成功后复位；
+  // 与 configPickerState 同款的 scopeKey 守卫——composer 跨 task/draft 复用时
+  // 旧 scope 的勾选不得泄漏进新 scope 的下一次提交。
+  const [toolSelectionState, setToolSelectionState] = useState<{
+    scopeKey: string;
+    selectedIds: ReadonlySet<string>;
+  }>(() => ({ scopeKey: configPickerScopeKey, selectedIds: EMPTY_TOOL_SELECTION_IDS }));
+  if (toolSelectionState.scopeKey !== configPickerScopeKey) {
+    setToolSelectionState({
+      scopeKey: configPickerScopeKey,
+      selectedIds: EMPTY_TOOL_SELECTION_IDS,
+    });
+  }
+  const selectedToolIds =
+    toolSelectionState.scopeKey === configPickerScopeKey
+      ? toolSelectionState.selectedIds
+      : EMPTY_TOOL_SELECTION_IDS;
+  const handleToggleToolSelection = useCallback(
+    (selectionId: string) => {
+      setToolSelectionState((current) => {
+        if (current.scopeKey !== configPickerScopeKey) return current;
+        const next = new Set(current.selectedIds);
+        if (next.has(selectionId)) {
+          next.delete(selectionId);
+        } else {
+          next.add(selectionId);
+        }
+        return { scopeKey: current.scopeKey, selectedIds: next };
+      });
+    },
+    [configPickerScopeKey],
+  );
+  const handleClearToolSelection = useCallback(() => {
+    setToolSelectionState((current) =>
+      current.scopeKey === configPickerScopeKey && current.selectedIds.size > 0
+        ? { scopeKey: current.scopeKey, selectedIds: EMPTY_TOOL_SELECTION_IDS }
+        : current,
+    );
+  }, [configPickerScopeKey]);
+  // 全局记忆 picker：勾选上限由行级 disabled 与这里双重守卫（服务侧上限以
+  // GLOBAL_MEMORY_SELECTION_LIMIT 为准）；菜单打开时按需拉取最新清单，
+  // 已勾选但被删除的 id 由发送端透传、CLI 静默跳过。
+  const handleToggleGlobalMemory = useCallback((memoryId: string) => {
+    setGlobalMemorySelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(memoryId)) {
+        next.delete(memoryId);
+      } else {
+        if (next.size >= GLOBAL_MEMORY_SELECTION_LIMIT) return current;
+        next.add(memoryId);
+      }
+      return next;
+    });
+  }, []);
+  const handleMemoryMenuOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) return;
+      const memoryService = services?.memoryService;
+      if (!memoryService) {
+        setGlobalMemoryListState({ loading: false, error: "unavailable" });
+        setGlobalMemoryEntries([]);
+        return;
+      }
+      setGlobalMemoryListState({ loading: true, error: null });
+      memoryService
+        .listGlobalMemories()
+        .then((entries) => {
+          setGlobalMemoryEntries(entries);
+          setGlobalMemoryListState({ loading: false, error: null });
+        })
+        .catch((error: unknown) => {
+          setGlobalMemoryEntries([]);
+          setGlobalMemoryListState({
+            loading: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+    },
+    [services],
+  );
+  // Picker 菜单开合只用于驱动插件目录懒加载：菜单打开或有勾选（发送 resolve 需要
+  // 最新 catalog）时才查询；关闭且无勾选回到静默。
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
+  const pluginReferenceCatalog = usePluginReferenceCatalog(
+    workspacePath,
+    workspaceIdentity,
+    sessionId,
+    toolsMenuOpen || selectedToolIds.size > 0,
+    { preferredRemoteSessionId: remoteSessionId },
+  );
+  const mcpStoreServers = useMcpStore((state) => state.servers);
+  const mcpEnabledStates = useMcpStore((state) => state.enabledStates);
+  const mcpStatusSnapshots = useMcpStore((state) => state.statusSnapshots);
+  const mcpCurrentProjectPath = useMcpStore((state) => state.currentProjectPath);
+  const mcpCurrentWorkspaceIdentity = useMcpStore((state) => state.currentWorkspaceIdentity);
+  // 与 McpSettingsSection 同款守卫：workspace 先切、MCP 目录异步加载后到的过渡帧里，
+  // store 仍是旧 workspace 的服务器列表，直接投影会把别处的 MCP 名称写进提示块。
+  const mcpStoreWorkspaceKey = mcpCurrentWorkspaceIdentity?.trim() || mcpCurrentProjectPath;
+  const mcpStoreMatchesWorkspace = Boolean(workspaceKey) && workspaceKey === mcpStoreWorkspaceKey;
+  const pickableMcpServers = useMemo(
+    () =>
+      mcpStoreMatchesWorkspace
+        ? selectPickableMcpServers(mcpStoreServers, mcpEnabledStates, mcpCurrentProjectPath)
+        : [],
+    [mcpStoreMatchesWorkspace, mcpStoreServers, mcpEnabledStates, mcpCurrentProjectPath],
+  );
   const [configPickerState, setConfigPickerState] = useState<{
     scopeKey: string;
     activePicker: V4ComposerConfigPicker | null;
@@ -1413,12 +1543,20 @@ function ConversationComposerImpl({
         // 里没有任何东西解析它），唯一作用是驱动一个已被产品裁掉的 chip，代价却是把一个
         // share URL 塞进发给模型的正文。模型侧内容由隐藏的 shared_context 消息经
         // inputIntent.sharedContextRefs 注入，与正文无关。
+        // 工具推荐（Tools Picker）：发送瞬间按最新 catalog/store resolve，
+        // 已禁用/卸载/冲突的条目静默丢弃；空选择不追加尾块，走默认逻辑。
+        const submittedToolRecommendations = resolveComposerToolRecommendations(
+          selectedToolIds,
+          pluginReferenceCatalog.entries,
+          pickableMcpServers,
+        );
         const promptText = serializeComposerPromptContexts(trimmed, {
           codeComments: currentCodeCommentContexts,
           conversationSelections: [],
           webElements: currentWebElementContexts,
           pptxElements: currentPptxElementReferences,
           pluginUiContexts: currentPluginUiContexts,
+          toolRecommendations: submittedToolRecommendations,
         });
         const contextAttachmentCount =
           countComposerPromptContexts({
@@ -1427,6 +1565,7 @@ function ConversationComposerImpl({
             webElements: currentWebElementContexts,
             pptxElements: currentPptxElementReferences,
             pluginUiContexts: currentPluginUiContexts,
+            toolRecommendations: submittedToolRecommendations,
           }) + (submittedShareContext ? 1 : 0);
         if (trimmed) {
           promptHistoryBeforeSend = readPromptHistoryEntries(workspacePath);
@@ -1468,8 +1607,12 @@ function ConversationComposerImpl({
               }
             : {}),
           telemetrySeed,
-          // 逐条 opt-in：仅开关打开的这一条消息携带全局记忆；发送后复位为默认关闭。
-          ...(globalMemoryOptIn ? { includeGlobalMemory: true } : {}),
+          // 逐条 opt-in：仅本次显式选中的记忆随消息携带（ids 有序）；发送后复位为空集。
+          // 勾选后中途关闭总开关的残留选择不随消息携带（CLI 同样会丢弃，但 wire
+          // 上不应发出与开关矛盾的意图）。
+          ...(globalMemoryEnabled && globalMemorySelectedIds.size > 0
+            ? { includedGlobalMemoryIds: [...globalMemorySelectedIds] }
+            : {}),
           ...(requestedDelivery ? { requestedDelivery } : {}),
           ...(heldQueueDisposition ? { heldQueueDisposition } : {}),
           ...(expectedHeldQueueItemIds ? { expectedHeldQueueItemIds } : {}),
@@ -1521,9 +1664,15 @@ function ConversationComposerImpl({
           return;
         }
         setHeldQueueConfirmation(null);
-        // 发送成功：本次消息已按 opt-in 携带（或明确未携带）全局记忆，复位开关为默认关闭，
-        // 下一条消息不会再携带（除非用户再次打开）。blocked/confirmationRequired 走上方早退，不复位。
-        setGlobalMemoryOptIn(false);
+        // 发送成功：本次消息已按 opt-in 携带（或明确未携带）全局记忆，复位选择为空集，
+        // 下一条消息不会再携带（除非用户再次勾选）。blocked/confirmationRequired 走上方早退，不复位。
+        setGlobalMemorySelectedIds(new Set<string>());
+        // 工具推荐同为逐条 opt-in：发送成功即复位，blocked/confirmationRequired 早退保留。
+        setToolSelectionState((current) =>
+          current.scopeKey === configPickerScopeKey && current.selectedIds.size > 0
+            ? { scopeKey: current.scopeKey, selectedIds: EMPTY_TOOL_SELECTION_IDS }
+            : current,
+        );
         // 暂存内容只有在发送成功后才移交给 task；失败仍保留为可重试草稿。
         await attachmentsApi.adoptSentAttachments(submittedAttachmentIds);
         // Bug 原因：发送等待期间产生的新正文属于下一次 Submission，旧 ACK 不能清除。
@@ -1572,7 +1721,8 @@ function ConversationComposerImpl({
       conversationTelemetry,
       draftConfig,
       createSubmissionFromComposer,
-      globalMemoryOptIn,
+      globalMemoryEnabled,
+      globalMemorySelectedIds,
       submissionReady,
       getCodeCommentContexts,
       telemetryDraftConfig,
@@ -1593,6 +1743,10 @@ function ConversationComposerImpl({
       updateComposerContent,
       webElementContexts,
       pptxElementReferences,
+      selectedToolIds,
+      pluginReferenceCatalog.entries,
+      pickableMcpServers,
+      configPickerScopeKey,
       workspaceIdentity,
       workspacePath,
     ],
@@ -2300,8 +2454,7 @@ function ConversationComposerImpl({
     const rows = snapshot?.rows?.window;
     if (!rows || rows.length === 0) return [];
     const realUserInputs = rows.filter(
-      (row): row is UserInputRow =>
-        row.kind === "userInput" && row.origin === "realUser",
+      (row): row is UserInputRow => row.kind === "userInput" && row.origin === "realUser",
     );
     return realUserInputs.slice(-3).map((row) => {
       const { body } = splitUserInputEpilogue(row.text, row.epilogueStart);
@@ -2324,16 +2477,35 @@ function ConversationComposerImpl({
           onConfigPickerOpenChange={handleConfigPickerOpenChange}
           onSwitchMode={onSwitchMode}
         />
-        {/* 全局记忆逐条 opt-in：仅总开关开启时显示；默认关闭，发送后自动复位。 */}
+        {/* 全局记忆逐条 opt-in：仅总开关开启时显示 picker；默认空集，发送后自动复位。 */}
         {globalMemoryEnabled ? (
-          <V4ComposerGlobalMemorySwitch
-            checked={globalMemoryOptIn}
-            onChange={setGlobalMemoryOptIn}
+          <V4ComposerMemoryPicker
+            memories={globalMemoryEntries}
+            loading={globalMemoryListState.loading}
+            error={globalMemoryListState.error}
+            selectedIds={globalMemorySelectedIds}
+            onToggle={handleToggleGlobalMemory}
+            onMenuOpenChange={handleMemoryMenuOpenChange}
             disabled={disabled}
           />
         ) : null}
         {/* 最近 3 条用户 prompt 的 peek 图标：hover 即可回看当前 session 在做什么。 */}
         <V4ComposerRecentPromptsHint items={recentPromptItems} />
+        {/* MCP/插件推荐选择器（Tools Picker）：逐条 opt-in，发送成功复位；
+            数据由宿主注入，picker 与提交 resolve 读同一份 catalog/MCP 列表。 */}
+        <V4ComposerToolsPicker
+          key={configPickerScopeKey}
+          pluginEntries={pluginReferenceCatalog.entries}
+          pluginsLoading={pluginReferenceCatalog.loading}
+          pluginsError={pluginReferenceCatalog.error}
+          mcpServers={pickableMcpServers}
+          mcpStatusSnapshots={mcpStatusSnapshots}
+          selectedIds={selectedToolIds}
+          onToggle={handleToggleToolSelection}
+          onClear={handleClearToolSelection}
+          onMenuOpenChange={setToolsMenuOpen}
+          disabled={disabled}
+        />
         {/* Bug 原因：附件画廊 rebase 曾整段覆盖 leadingActions，误删 staging 的 CUA 常驻入口。
             入口自身继续负责平台、远程与设置可见性，不在 composer 重复判定。 */}
         <V4ComposerCuaEntry
@@ -2354,11 +2526,18 @@ function ConversationComposerImpl({
     [
       activeConfigPicker,
       canStop,
+      configPickerScopeKey,
       disabled,
       draftConfig,
       globalMemoryEnabled,
-      globalMemoryOptIn,
+      globalMemoryEntries,
+      globalMemoryListState,
+      globalMemorySelectedIds,
       handleConfigPickerOpenChange,
+      handleMemoryMenuOpenChange,
+      handleToggleGlobalMemory,
+      handleClearToolSelection,
+      handleToggleToolSelection,
       isWebRemoteControl,
       backgroundWorkOpenTarget,
       onOpenRunningBackgroundWorks,
@@ -2368,6 +2547,12 @@ function ConversationComposerImpl({
       remoteSessionId,
       runningSubagentCount,
       snapshot?.backgroundWorks,
+      selectedToolIds,
+      pluginReferenceCatalog.entries,
+      pluginReferenceCatalog.loading,
+      pluginReferenceCatalog.error,
+      pickableMcpServers,
+      mcpStatusSnapshots,
       workspaceIdentity,
       workspacePath,
     ],

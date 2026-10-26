@@ -31,6 +31,12 @@ xdg-mime default zcode.desktop x-scheme-handler/zcode
 
 核心 deep link 注册必须先于图标安装执行。图标安装是可选桌面集成，目录创建、文件读取、复制或缓存刷新失败时只能降级记录 `warn`，不得阻断 `.desktop` 写入和 `xdg-mime` 协议关联。
 
+## 桌面标识（Wayland app_id / X11 WM_CLASS）
+
+Linux 打包态启动时调用 `app.setDesktopName(runtimeDesktopName)`（Preview → `zcode-preview`，生产 → `zcode`）。Electron 会写入 `CHROME_DESKTOP`，作为 Wayland 的 `app_id` 与 X11 的 `WM_CLASS`。
+
+该值必须与安装的 `.desktop` 文件名（去掉后缀）一致；否则 Dock 无法把运行窗口归到启动器，表现为图标下方没有运行点。electron-builder 生成的 desktop entry 通过 `linux.desktop.entry.StartupWMClass` 同步该值，兼容 X11 的匹配路径。
+
 ## 边界
 
 该能力不能保证所有 Linux 桌面环境 100% 显示任务栏图标。Wayland/X11、GNOME/KDE/其他 Dock、用户从终端直跑 AppImage、图标缓存策略都会影响匹配结果。需要稳定桌面集成时，deb 安装包仍是优先推荐路径。

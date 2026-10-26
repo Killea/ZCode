@@ -34,6 +34,7 @@ interface TaskQueryCacheState {
     total: number;
     hasMore: boolean;
     unreadTaskKeys?: TaskEntityKey[];
+    pinnedTaskKeys?: TaskEntityKey[];
     partial?: boolean;
     loadingShardKeys?: string[];
     failedShardKeys?: string[];
@@ -46,6 +47,7 @@ interface TaskQueryCacheState {
       total: number;
       hasMore: boolean;
       unreadTaskKeys?: TaskEntityKey[];
+      pinnedTaskKeys?: TaskEntityKey[];
       partial?: boolean;
       loadingShardKeys?: string[];
       failedShardKeys?: string[];
@@ -87,6 +89,7 @@ function buildCachedTaskListResult(params: {
   descriptor: TaskListCacheDescriptor;
   taskKeys: TaskEntityKey[];
   unreadTaskKeys?: TaskEntityKey[];
+  pinnedTaskKeys?: TaskEntityKey[];
   searchSnippetsByTaskKey?: Record<TaskEntityKey, string>;
   searchSnippetListsByTaskKey?: Record<TaskEntityKey, string[]>;
   total: number;
@@ -99,6 +102,7 @@ function buildCachedTaskListResult(params: {
   return {
     taskKeys: params.taskKeys,
     unreadTaskKeys: params.unreadTaskKeys,
+    pinnedTaskKeys: params.pinnedTaskKeys,
     searchSnippetsByTaskKey: params.searchSnippetsByTaskKey,
     searchSnippetListsByTaskKey: params.searchSnippetListsByTaskKey,
     total: params.total,
@@ -117,7 +121,9 @@ function matchesTaskMembership(
   descriptor: TaskListCacheDescriptor,
   membership: TaskListMembershipState,
 ): boolean {
-  const kind = descriptor.kind === "workspace" ? "timeline" : descriptor.kind;
+  // workspace 视图把置顶任务保留在各自项目列表内（项目内置顶），
+  // 归属规则因此是 !archived（"active"）而非 !pinned && !archived（"timeline"）。
+  const kind = descriptor.kind === "workspace" ? "active" : descriptor.kind;
   return matchesTaskListMembershipKind(membership, kind);
 }
 
@@ -146,9 +152,11 @@ function sortTaskKeysByDescriptor(params: {
   taskKeys: TaskEntityKey[];
   taskMetaByEntityKey: Record<TaskEntityKey, ZCodeTaskListItem>;
   descriptor: TaskListCacheDescriptor;
+  /** workspace 查询的置顶成员集合：排序后稳定分区到最前，只决定分区，不改变分区内部排序。 */
+  pinnedTaskKeys?: ReadonlySet<TaskEntityKey>;
 }): TaskEntityKey[] {
   const uniqueTaskKeys = [...new Set(params.taskKeys)];
-  return uniqueTaskKeys.sort((leftKey, rightKey) => {
+  const sortedTaskKeys = uniqueTaskKeys.sort((leftKey, rightKey) => {
     const leftTask = params.taskMetaByEntityKey[leftKey];
     const rightTask = params.taskMetaByEntityKey[rightKey];
     if (!leftTask && !rightTask) {
@@ -162,6 +170,14 @@ function sortTaskKeysByDescriptor(params: {
     }
     return compareZCodeTaskListItems(leftTask, rightTask, params.descriptor.sortBy);
   });
+  const pinnedTaskKeys = params.pinnedTaskKeys;
+  if (pinnedTaskKeys && pinnedTaskKeys.size > 0) {
+    return [
+      ...sortedTaskKeys.filter((taskKey) => pinnedTaskKeys.has(taskKey)),
+      ...sortedTaskKeys.filter((taskKey) => !pinnedTaskKeys.has(taskKey)),
+    ];
+  }
+  return sortedTaskKeys;
 }
 
 // republish（membership 重拉、sessions-index 帧）产出的 item 都是全新对象引用。
@@ -264,6 +280,7 @@ function isQueryResultEquivalent(params: {
   previousResult: CachedTaskListResult | undefined;
   taskKeys: TaskEntityKey[];
   unreadTaskKeys?: TaskEntityKey[];
+  pinnedTaskKeys?: TaskEntityKey[];
   searchSnippetsByTaskKey?: Record<TaskEntityKey, string>;
   searchSnippetListsByTaskKey?: Record<TaskEntityKey, string[]>;
   total: number;
@@ -293,6 +310,7 @@ function isQueryResultEquivalent(params: {
     left.length === right.length && left.every((value, index) => value === right[index]);
   if (
     !sameStringArray(previous.unreadTaskKeys ?? [], params.unreadTaskKeys ?? []) ||
+    !sameStringArray(previous.pinnedTaskKeys ?? [], params.pinnedTaskKeys ?? []) ||
     !sameStringArray(previous.loadingShardKeys, params.loadingShardKeys) ||
     !sameStringArray(previous.failedShardKeys, params.failedShardKeys)
   ) {
@@ -312,6 +330,8 @@ function preserveFreshLocalTaskKeys(params: {
   taskMetaByEntityKey: Record<TaskEntityKey, CachedTaskListItem>;
   descriptor: TaskListCacheDescriptor;
 }): { taskKeys: TaskEntityKey[]; preservedCount: number } {
+  // workspace 查询的置顶成员集（项目内置顶分区依据；非 workspace 结果恒为空）。
+  const pinnedTaskKeySet = new Set(params.previousResult?.pinnedTaskKeys ?? []);
   if (!params.previousResult || params.descriptor.search) {
     return { taskKeys: params.incomingTaskKeys, preservedCount: 0 };
   }
@@ -335,6 +355,7 @@ function preserveFreshLocalTaskKeys(params: {
     taskKeys: [...params.incomingTaskKeys, ...preservedTaskKeys],
     taskMetaByEntityKey: params.taskMetaByEntityKey,
     descriptor: params.descriptor,
+    pinnedTaskKeys: pinnedTaskKeySet,
   });
   const visibleTaskKeys =
     params.descriptor.visibleLimit === null
@@ -357,6 +378,7 @@ export const useTaskQueryCacheStore = create<TaskQueryCacheState>()((set) => ({
     total,
     hasMore,
     unreadTaskKeys,
+    pinnedTaskKeys,
     partial,
     loadingShardKeys,
     failedShardKeys,
@@ -419,6 +441,7 @@ export const useTaskQueryCacheStore = create<TaskQueryCacheState>()((set) => ({
         descriptor,
         taskKeys,
         unreadTaskKeys,
+        pinnedTaskKeys,
         searchSnippetsByTaskKey:
           Object.keys(searchSnippetsByTaskKey).length > 0 ? searchSnippetsByTaskKey : undefined,
         searchSnippetListsByTaskKey:
@@ -447,6 +470,7 @@ export const useTaskQueryCacheStore = create<TaskQueryCacheState>()((set) => ({
           previousResult: state.resultsByQueryKey[queryKey],
           taskKeys,
           unreadTaskKeys: resultParams.unreadTaskKeys,
+          pinnedTaskKeys: resultParams.pinnedTaskKeys,
           searchSnippetsByTaskKey: resultParams.searchSnippetsByTaskKey,
           searchSnippetListsByTaskKey: resultParams.searchSnippetListsByTaskKey,
           total: resultParams.total,
@@ -546,6 +570,7 @@ export const useTaskQueryCacheStore = create<TaskQueryCacheState>()((set) => ({
           descriptor: entry.descriptor,
           taskKeys,
           unreadTaskKeys: entry.unreadTaskKeys,
+          pinnedTaskKeys: entry.pinnedTaskKeys,
           searchSnippetsByTaskKey:
             Object.keys(searchSnippetsByTaskKey).length > 0 ? searchSnippetsByTaskKey : undefined,
           searchSnippetListsByTaskKey:
@@ -571,6 +596,7 @@ export const useTaskQueryCacheStore = create<TaskQueryCacheState>()((set) => ({
             previousResult,
             taskKeys,
             unreadTaskKeys: resultParams.unreadTaskKeys,
+            pinnedTaskKeys: resultParams.pinnedTaskKeys,
             searchSnippetsByTaskKey: resultParams.searchSnippetsByTaskKey,
             searchSnippetListsByTaskKey: resultParams.searchSnippetListsByTaskKey,
             total: resultParams.total,
@@ -650,6 +676,7 @@ export const useTaskQueryCacheStore = create<TaskQueryCacheState>()((set) => ({
             taskKeys: result.taskKeys,
             taskMetaByEntityKey: nextTaskMetaByEntityKey,
             descriptor: result.descriptor,
+            pinnedTaskKeys: new Set(result.pinnedTaskKeys ?? []),
           }),
         };
       }
@@ -708,6 +735,9 @@ export const useTaskQueryCacheStore = create<TaskQueryCacheState>()((set) => ({
         const unreadTaskKeysWithoutTarget = (result.unreadTaskKeys ?? []).filter(
           (taskKey) => taskKey !== previousEntityKey && taskKey !== nextEntityKey,
         );
+        const pinnedTaskKeysWithoutTarget = (result.pinnedTaskKeys ?? []).filter(
+          (taskKey) => taskKey !== previousEntityKey && taskKey !== nextEntityKey,
+        );
         const visibleCandidateKeys = nextIncluded
           ? [...taskKeysWithoutTarget, nextEntityKey]
           : taskKeysWithoutTarget;
@@ -715,10 +745,18 @@ export const useTaskQueryCacheStore = create<TaskQueryCacheState>()((set) => ({
           nextIncluded && typeof mergedNextTask.unreadAt === "number"
             ? [...unreadTaskKeysWithoutTarget, nextEntityKey]
             : unreadTaskKeysWithoutTarget;
+        // workspace 查询的置顶成员集与 unreadTaskKeys 同款维护：
+        // 项目内置顶徽标/分区只认分页前的完整归属，不看当前可见窗口。
+        const nextPinnedTaskKeys =
+          nextIncluded && nextState.pinned
+            ? [...pinnedTaskKeysWithoutTarget, nextEntityKey]
+            : pinnedTaskKeysWithoutTarget;
         const sortedTaskKeys = sortTaskKeysByDescriptor({
           taskKeys: visibleCandidateKeys,
           taskMetaByEntityKey: nextTaskMetaByEntityKey,
           descriptor: result.descriptor,
+          pinnedTaskKeys:
+            result.descriptor.kind === "workspace" ? new Set(nextPinnedTaskKeys) : undefined,
         });
         const visibleTaskKeys =
           result.descriptor.visibleLimit === null
@@ -737,6 +775,7 @@ export const useTaskQueryCacheStore = create<TaskQueryCacheState>()((set) => ({
           ...result,
           taskKeys: visibleTaskKeys,
           ...(result.unreadTaskKeys ? { unreadTaskKeys: nextUnreadTaskKeys } : {}),
+          ...(result.pinnedTaskKeys ? { pinnedTaskKeys: nextPinnedTaskKeys } : {}),
           total: nextTotal,
           hasMore: nextTotal > visibleTaskKeys.length,
           stale: result.stale || shouldBackgroundRefresh,
@@ -831,19 +870,24 @@ export const useTaskQueryCacheStore = create<TaskQueryCacheState>()((set) => ({
 
       const nextResultsByQueryKey: Record<TaskListCacheKey, CachedTaskListResult> = {};
       for (const [queryKey, result] of Object.entries(state.resultsByQueryKey)) {
-        if (!result.taskKeys.includes(entityKey)) {
+        const inVisible = result.taskKeys.includes(entityKey);
+        const inPinned = (result.pinnedTaskKeys ?? []).includes(entityKey);
+        if (!inVisible && !inPinned) {
           nextResultsByQueryKey[queryKey] = result;
           continue;
         }
 
         const taskKeys = result.taskKeys.filter((taskKey) => taskKey !== entityKey);
-        removedFromVisibleCache = true;
+        removedFromVisibleCache = removedFromVisibleCache || inVisible;
         // 删除 task 以前只能整表刷新；这里只对实际可见缓存命中的列表扣减 total。
         // 对未出现在折叠可见区的隐藏项不猜 membership，避免误扣其它列表计数。
-        const total = Math.max(0, result.total - 1);
+        const total = Math.max(0, result.total - (inVisible ? 1 : 0));
         nextResultsByQueryKey[queryKey] = {
           ...result,
           taskKeys,
+          ...(result.pinnedTaskKeys
+            ? { pinnedTaskKeys: result.pinnedTaskKeys.filter((key) => key !== entityKey) }
+            : {}),
           total,
           hasMore: total > taskKeys.length,
         };

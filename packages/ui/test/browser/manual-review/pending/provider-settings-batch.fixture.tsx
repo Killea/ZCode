@@ -233,6 +233,7 @@ function Fixture() {
                     models: p.models.filter((m) => m.modelId !== modelId),
                   }));
                 }}
+                onDelete={async () => undefined}
                 onTestModel={async () => {
                   await request("test", {});
                   return { success: true };

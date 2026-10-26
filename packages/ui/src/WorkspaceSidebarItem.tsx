@@ -3,6 +3,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -137,6 +138,7 @@ export const WorkspaceSidebarItem = memo(function WorkspaceSidebarItem({
   onSelectTask,
   onStartDraftInWorkspace,
   taskItems,
+  taskPinnedTaskIds,
   taskListLoading,
   taskListHasMore,
   taskListHasUnread = false,
@@ -167,6 +169,8 @@ export const WorkspaceSidebarItem = memo(function WorkspaceSidebarItem({
   ) => void;
   onStartDraftInWorkspace: (targetWorkspacePath: string, targetWorkspaceIdentity?: string) => void;
   taskItems: ZCodeTaskMeta[];
+  /** 项目内置顶成员的 taskId；由 workspace 任务组分页前归属固化，驱动徽标与列表分区。 */
+  taskPinnedTaskIds?: string[];
   taskListLoading: boolean;
   taskListHasMore: boolean;
   taskListHasUnread?: boolean;
@@ -214,6 +218,15 @@ export const WorkspaceSidebarItem = memo(function WorkspaceSidebarItem({
   const zcodeTaskService = services.zcodeTaskService;
   const taskItemsRef = useRef(taskItems);
   taskItemsRef.current = taskItems;
+  // 项目内置顶：taskItems 已含 pinned 行；pinnedTasks 只是其中归属 pinned 的子集，
+  // 供 TaskList 点亮徽标并把置顶行稳定分在列表最前。
+  const pinnedTaskItems = useMemo(() => {
+    if (!taskPinnedTaskIds || taskPinnedTaskIds.length === 0) {
+      return EMPTY_PINNED_TASKS;
+    }
+    const pinnedIdSet = new Set(taskPinnedTaskIds);
+    return taskItems.filter((task) => pinnedIdSet.has(task.taskId));
+  }, [taskItems, taskPinnedTaskIds]);
   const workspaceZCodeStateRef = useRef(workspaceZCodeState);
   workspaceZCodeStateRef.current = workspaceZCodeState;
   const findCurrentTaskItem = useCallback((taskId: string) => {
@@ -1127,7 +1140,7 @@ export const WorkspaceSidebarItem = memo(function WorkspaceSidebarItem({
             remoteSessionId={tab.remoteSessionId}
             workspaceIdentity={tab.workspaceIdentity}
             tasks={taskItems}
-            pinnedTasks={EMPTY_PINNED_TASKS}
+            pinnedTasks={pinnedTaskItems}
             activeTaskId={isActiveWorkspace ? activeTaskId : null}
             onSelectTask={handleSelectTask}
             showCreateButton={false}

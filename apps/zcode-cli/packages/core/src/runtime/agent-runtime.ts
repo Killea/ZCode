@@ -131,6 +131,7 @@ import type { AgentRuntimeInternal } from "./internal.js";
 import { InMemoryRuntimeTaskRegistry, type RuntimeTaskRegistry } from "../runtime-task/registry.js";
 import { createMemoryRecallState } from "../memory/recall/index.js";
 import type { MemoryRecallState } from "../memory/recall/index.js";
+import type { GlobalMemoryEntryInjection } from "../memory/global-content.js";
 import type { ChildClientPortsContext, ClientFacingPorts } from "./helpers/child-client-ports.js";
 import type { ProjectMemoryRecallPrefetch } from "./helpers/project-memory-recall.js";
 import type { ProjectMemoryExtractionScheduler } from "./helpers/project-memory-extraction.js";
@@ -180,10 +181,12 @@ export class AgentRuntime {
   private latestContextBuildResult?: ContextBuildResult;
   private memoryRoot?: string;
   private memoryIndexContent?: string;
-  private globalMemoryFile?: string;
-  private globalMemoryContent?: string;
-  /** 仅当前 Turn 用户显式选择携带全局记忆时为 true；每轮开始重置，默认 false。 */
-  private turnGlobalMemoryIncluded?: boolean;
+  /** 全局记忆目录：undefined = 未解析，null = 总开关关闭或非主任务类型，string = 可用路径。 */
+  private globalMemoryDir?: string | null;
+  /** 本轮 Turn 冻结的全局记忆选择 id（已去重+slug 校验）；每轮开始重置，默认空。 */
+  private turnSelectedGlobalMemoryIds: readonly string[] = [];
+  /** 本轮已加载的全局记忆条目（context_initialization 阶段读盘）；随选择每轮重置。 */
+  private turnGlobalMemories: readonly GlobalMemoryEntryInjection[] = [];
   private memoryRecallState: MemoryRecallState;
   private memoryRecallPrefetch?: ProjectMemoryRecallPrefetch;
   private memoryExtractionScheduler?: ProjectMemoryExtractionScheduler;

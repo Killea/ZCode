@@ -9,6 +9,8 @@ export interface ComposerSubmissionConfig {
   planEnabled: boolean;
   /** 逐条 opt-in：本次提交是否携带全局（跨工作区）记忆；缺省=不携带。 */
   includeGlobalMemory?: boolean;
+  /** 本轮选中的全局记忆 id（有序）；空/缺省 = 不携带；ids 权威，覆盖上面的 bool。 */
+  includedGlobalMemoryIds?: readonly string[];
 }
 
 /** 在点击提交的瞬间，把 Composer 意图冻结成本次 Submission 的执行配置。 */

@@ -18,8 +18,7 @@ export function rebuildContextPrefix(
         runtime.memoryRoot,
         {
           memoryIndexContent: runtime.memoryIndexContent,
-          globalMemoryFile: runtime.globalMemoryFile,
-          globalMemoryContent: runtime.globalMemoryContent,
+          globalMemoryDir: runtime.globalMemoryDir ?? undefined,
           model: options.model,
           persistEnvInfo: false,
         },
@@ -36,8 +35,7 @@ export function rebuildContextPrefix(
     runtime.memoryRoot,
     {
       memoryIndexContent: runtime.memoryIndexContent,
-      globalMemoryFile: runtime.globalMemoryFile,
-      globalMemoryContent: runtime.globalMemoryContent,
+      globalMemoryDir: runtime.globalMemoryDir ?? undefined,
       model: options.model,
     },
   );

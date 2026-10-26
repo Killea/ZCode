@@ -27,6 +27,8 @@ export interface WorkspaceTaskListGroup {
   hasUnread: boolean;
   /** 组内在跑的工作流 run 数：项目收起时组头旁的脉冲灯。 */
   liveWorkflowCount: number;
+  /** 项目内置顶成员的 taskId 集合（分页前固化）；TaskList 徽标与分区排序的依据。 */
+  pinnedTaskIds: string[];
 }
 
 export function buildWorkspaceTaskListDisplayGroups(params: {
@@ -80,6 +82,7 @@ export function buildWorkspaceTaskListDisplayGroups(params: {
       activeTaskId: optimisticOverlay?.activeTaskId ?? null,
       sortBy: params.sortBy,
       visibleLimit: config.visibleLimit,
+      pinnedTaskKeys: new Set(displayResult?.pinnedTaskKeys ?? []),
     });
     const total = Math.max(displayResult?.total ?? cachedItems.length, items.length);
     const hasUnread =
@@ -92,6 +95,9 @@ export function buildWorkspaceTaskListDisplayGroups(params: {
         count + countLiveWorkflowRuns(getTaskListRowActivity(task)?.workflowActivity),
       0,
     );
+    const pinnedTaskIds = (displayResult?.pinnedTaskKeys ?? [])
+      .map((taskKey) => params.taskMetaByEntityKey[taskKey]?.taskId)
+      .filter((taskId): taskId is string => Boolean(taskId));
     const nextGroup = {
       workspacePath: config.scope.workspacePath,
       workspaceIdentity: config.scope.workspaceIdentity,
@@ -100,6 +106,7 @@ export function buildWorkspaceTaskListDisplayGroups(params: {
       hasMore: Math.max(total, items.length) > items.length,
       hasUnread,
       liveWorkflowCount,
+      pinnedTaskIds,
     };
     if (
       previousGroup &&
@@ -109,6 +116,10 @@ export function buildWorkspaceTaskListDisplayGroups(params: {
       previousGroup.hasMore === nextGroup.hasMore &&
       previousGroup.hasUnread === nextGroup.hasUnread &&
       previousGroup.liveWorkflowCount === nextGroup.liveWorkflowCount &&
+      previousGroup.pinnedTaskIds.length === nextGroup.pinnedTaskIds.length &&
+      previousGroup.pinnedTaskIds.every(
+        (taskId, index) => taskId === nextGroup.pinnedTaskIds[index],
+      ) &&
       areTaskListItemsEquivalent(previousGroup.items, nextGroup.items)
     ) {
       cache.set(config.workspaceKey, previousGroup);

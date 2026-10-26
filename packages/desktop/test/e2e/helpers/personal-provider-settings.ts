@@ -4,7 +4,6 @@ import {
   TID_MODEL_PROVIDER_API_KEY_INPUT,
   TID_MODEL_PROVIDER_ADD_PROVIDER_BUTTON,
   TID_MODEL_PROVIDER_BASE_URL_INPUT,
-  TID_MODEL_PROVIDER_NAME_EDIT_BUTTON,
   TID_MODEL_PROVIDER_NAME_INPUT,
   TID_MODEL_PROVIDER_NAV_ITEM,
   TID_MODEL_PROVIDER_TEMPLATE_ITEM,
@@ -74,13 +73,11 @@ export async function createAndConfigurePersonalProvider({
       timeoutMsg: `新建的 Template Provider 没有进入导航: ${createdProviderId}`,
     });
   }
-  await waitForTestIdByDom("model-provider-actions-button", {
+  await waitForTestIdByDom(TID_MODEL_PROVIDER_NAME_INPUT, {
     timeout: 15_000,
     timeoutMsg: "原子创建后没有进入新供应商详情",
   });
 
-  await $('[data-testid="model-provider-actions-button"]').click();
-  await clickTestIdByDom(TID_MODEL_PROVIDER_NAME_EDIT_BUTTON);
   await setInputValueByTestIdDom(TID_MODEL_PROVIDER_NAME_INPUT, providerName, {
     timeoutMsg: "新供应商名称输入框没有出现",
   });

@@ -80,6 +80,11 @@ export { mapSessionEvent } from "./zcode-protocol/session-mapper.js";
 export { prepareZCodeTelemetryEnv, shutdownZCodeTelemetry } from "./telemetry-bootstrap.js";
 export type { SessionTranscriptMessage, SessionTranscriptPart } from "./session-transcript.js";
 export { listZCodeSessions, resolveLatestSession } from "./sessions.js";
+export { openSessionTransferStores, type SessionTransferStores } from "./sessions.js";
+export {
+  isTaskListSessionType,
+  TASK_LIST_SESSION_TYPES,
+} from "./zcode-protocol-v4/task-list-session-membership.js";
 export { inspectZCodeSkill, listZCodeSkills } from "./skills.js";
 export type {
   InspectZCodeSkillOptions,
@@ -101,3 +106,4 @@ export type {
   WorkspaceHookTrustCliStatus,
   WorkspaceHookTrustCliTarget,
 } from "./workspace-hook-trust-cli.js";
+export * from "./session-transfer/index.js";

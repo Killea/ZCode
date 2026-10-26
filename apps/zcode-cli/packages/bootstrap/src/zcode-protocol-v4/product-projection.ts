@@ -332,6 +332,8 @@ export interface ConversationEditTarget {
     modelSelection?: TurnInputIntentMetadata["modelSelection"];
     mode?: TurnInputIntentMetadata["mode"];
     planEnabled?: boolean;
+    includeGlobalMemory?: boolean;
+    includedGlobalMemoryIds?: readonly string[];
     provenance?: CanonicalUserIntentFact["provenance"];
   };
 }
@@ -2141,6 +2143,9 @@ export class ProductProjection {
         ...(fact.botGroupSource ? { botGroupSource: fact.botGroupSource } : {}),
         ...(fact.clientId ? { clientId: fact.clientId } : {}),
         ...(fact.highspeed ? { highspeed: fact.highspeed } : {}),
+        ...(fact.includedGlobalMemoryIds?.length
+          ? { includedGlobalMemoryIds: [...fact.includedGlobalMemoryIds] }
+          : {}),
         ...(fact.workflowLaunch ? { workflowLaunch: fact.workflowLaunch } : {}),
         ...(fact.epilogueStart === undefined ? {} : { epilogueStart: fact.epilogueStart }),
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
@@ -2176,6 +2181,12 @@ export class ProductProjection {
                 ...(fact.modelSelection ? { modelSelection: fact.modelSelection } : {}),
                 ...(fact.mode ? { mode: fact.mode } : {}),
                 ...(fact.planEnabled !== undefined ? { planEnabled: fact.planEnabled } : {}),
+                ...(fact.includeGlobalMemory !== undefined
+                  ? { includeGlobalMemory: fact.includeGlobalMemory }
+                  : {}),
+                ...(fact.includedGlobalMemoryIds !== undefined
+                  ? { includedGlobalMemoryIds: [...fact.includedGlobalMemoryIds] }
+                  : {}),
                 ...(fact.provenance ? { provenance: fact.provenance } : {}),
               },
             }
@@ -3661,6 +3672,13 @@ export class ProductProjection {
       modelSelection: payload.intent?.modelSelection ?? existing?.modelSelection,
       mode: payload.intent?.mode ?? existing?.mode,
       planEnabled: payload.intent?.planEnabled ?? existing?.planEnabled,
+      // 本轮全局记忆选择随 QueueItem 投影固化：提升执行经
+      // inputIntentMetadataFromQueueItem 复用同一选择。
+      includeGlobalMemory: payload.intent?.includeGlobalMemory ?? existing?.includeGlobalMemory,
+      includedGlobalMemoryIds:
+        payload.intent?.includedGlobalMemoryIds !== undefined
+          ? [...payload.intent.includedGlobalMemoryIds]
+          : existing?.includedGlobalMemoryIds,
       sharedContextRefs: payload.intent?.sharedContextRefs ?? existing?.sharedContextRefs,
       provenance: payload.intent?.provenance ?? existing?.provenance,
       // 排队事件和原地编辑都必须保留可信接入来源，不能在 UI 投影时丢掉发送者。
@@ -3805,6 +3823,12 @@ export class ProductProjection {
           ...(queueItem.modelSelection ? { modelSelection: queueItem.modelSelection } : {}),
           ...(queueItem.mode ? { mode: queueItem.mode } : {}),
           ...(queueItem.planEnabled !== undefined ? { planEnabled: queueItem.planEnabled } : {}),
+          ...(queueItem.includeGlobalMemory !== undefined
+            ? { includeGlobalMemory: queueItem.includeGlobalMemory }
+            : {}),
+          ...(queueItem.includedGlobalMemoryIds !== undefined
+            ? { includedGlobalMemoryIds: [...queueItem.includedGlobalMemoryIds] }
+            : {}),
           admissionSeq: queueItem.order.admissionSeq,
           admittedAt: queueItem.admittedAt,
           requestedDelivery: queueItem.delivery.requested,

@@ -315,6 +315,12 @@ export interface TurnInputIntentMetadata {
   planEnabled?: boolean;
   /** 本次 Submission 用户显式选择携带全局（跨工作区）记忆；仅当前 Turn 生效，不修改 Session 配置。 */
   includeGlobalMemory?: boolean;
+  /**
+   * 本轮选中的全局记忆 id（"default" 或 slug），有序、最多 4 条。
+   * 权威字段：显式提供（含空数组）时直接采用；缺省时 includeGlobalMemory===true
+   * 兼容映射为 ["default"]。无效 id 由 runtime 静默跳过。
+   */
+  includedGlobalMemoryIds?: readonly string[];
   conversationQuotes?: Array<{
     text: string;
     path?: string;

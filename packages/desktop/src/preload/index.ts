@@ -82,6 +82,15 @@ import type {
   WebRemoteControlStatus,
   WebRemoteControlTaskTarget,
   WebRemoteControlWorkspaceTarget,
+  SessionSharingClosePeerRequest,
+  SessionSharingConnectPeerRequest,
+  SessionSharingDisconnectPeerRequest,
+  SessionSharingImportPeerSessionRequest,
+  SessionSharingListPeerSessionsRequest,
+  SessionSharingLogEntry,
+  SessionSharingPreviewPeerSessionRequest,
+  SessionSharingStartRequest,
+  SessionSharingStatus,
   RemoteConnectionRuntimeLog,
   WindowControlsOverlayMetrics,
   WindowControlsOverlayReadyPayload,
@@ -297,6 +306,37 @@ contextBridge.exposeInMainWorld("zcode", {
     return () =>
       ipcRenderer.removeListener(PlatformChannels.WebRemoteControlStatusChanged, handler);
   },
+  startSessionSharing: (options?: SessionSharingStartRequest): Promise<SessionSharingStatus> =>
+    ipcRenderer.invoke(PlatformChannels.StartSessionSharing, options ?? {}),
+  stopSessionSharing: (): Promise<SessionSharingStatus> =>
+    ipcRenderer.invoke(PlatformChannels.StopSessionSharing),
+  getSessionSharingStatus: (): Promise<SessionSharingStatus> =>
+    ipcRenderer.invoke(PlatformChannels.GetSessionSharingStatus),
+  getSessionSharingLogs: (): Promise<SessionSharingLogEntry[]> =>
+    ipcRenderer.invoke(PlatformChannels.GetSessionSharingLogs),
+  refreshSessionSharingCode: (): Promise<SessionSharingStatus> =>
+    ipcRenderer.invoke(PlatformChannels.RefreshSessionSharingCode),
+  disconnectSessionSharingPeer: (
+    request: SessionSharingDisconnectPeerRequest,
+  ): Promise<SessionSharingStatus> =>
+    ipcRenderer.invoke(PlatformChannels.DisconnectSessionSharingPeer, request),
+  onSessionSharingStatusChanged: (
+    callback: (status: SessionSharingStatus) => void,
+  ): (() => void) => {
+    const handler = (_event: unknown, payload: SessionSharingStatus) => callback(payload);
+    ipcRenderer.on(PlatformChannels.SessionSharingStatusChanged, handler);
+    return () => ipcRenderer.removeListener(PlatformChannels.SessionSharingStatusChanged, handler);
+  },
+  connectSessionSharingPeer: (request: SessionSharingConnectPeerRequest) =>
+    ipcRenderer.invoke(PlatformChannels.ConnectSessionSharingPeer, request),
+  listSessionSharingPeerSessions: (request: SessionSharingListPeerSessionsRequest) =>
+    ipcRenderer.invoke(PlatformChannels.ListSessionSharingPeerSessions, request),
+  previewSessionSharingPeerSession: (request: SessionSharingPreviewPeerSessionRequest) =>
+    ipcRenderer.invoke(PlatformChannels.PreviewSessionSharingPeerSession, request),
+  importSessionSharingPeerSession: (request: SessionSharingImportPeerSessionRequest) =>
+    ipcRenderer.invoke(PlatformChannels.ImportSessionSharingPeerSession, request),
+  closeSessionSharingPeer: (request: SessionSharingClosePeerRequest): Promise<void> =>
+    ipcRenderer.invoke(PlatformChannels.CloseSessionSharingPeer, request),
   disposeRemoteSession: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke(PlatformChannels.DisposeRemoteSession, sessionId),
   isDockerAvailable: (): Promise<boolean> => ipcRenderer.invoke(PlatformChannels.IsDockerAvailable),

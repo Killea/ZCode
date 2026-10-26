@@ -388,7 +388,10 @@ describe("taskQueryCacheStore applyTaskMutation", () => {
     expect(useTaskQueryCacheStore.getState().taskUnreadOverlayByEntityKey).toEqual({});
   });
 
-  it("任务从 workspace 列表移动到 pinned 列表时同步更新两个缓存", () => {
+  // 项目内置顶语义：workspace 视图按 active 归属（含 pinned），置顶任务保留在所属
+  // 项目列表（列表内置顶分区，见 sortTaskKeysByDescriptor 的 pinnedTaskKeys 分区），
+  // 同时进入全局 pinned 列表缓存——不再是旧语义"置顶即移出项目列表"。
+  it("任务置顶时保留在 workspace 列表并同步进入 pinned 列表", () => {
     const workspaceQueryKey = "workspace-list";
     const pinnedQueryKey = "pinned-list";
     const task = createTaskMeta({ taskId: "task-to-pin", updatedAt: 10 });
@@ -416,8 +419,8 @@ describe("taskQueryCacheStore applyTaskMutation", () => {
       nextState: { pinned: true, archived: false },
     });
 
-    expect(taskIdsFor(workspaceQueryKey)).toEqual([]);
-    expect(useTaskQueryCacheStore.getState().resultsByQueryKey[workspaceQueryKey]?.total).toBe(0);
+    expect(taskIdsFor(workspaceQueryKey)).toEqual(["task-to-pin"]);
+    expect(useTaskQueryCacheStore.getState().resultsByQueryKey[workspaceQueryKey]?.total).toBe(1);
     expect(taskIdsFor(pinnedQueryKey)).toEqual(["task-to-pin"]);
     expect(useTaskQueryCacheStore.getState().resultsByQueryKey[pinnedQueryKey]?.total).toBe(1);
   });

@@ -18,6 +18,21 @@ import type {
   WebRemoteControlWorkspaceTarget,
 } from "./web-remote-control.js";
 import type { AppSettings, Locale } from "./protocol.js";
+import type {
+  SessionSharingClosePeerRequest,
+  SessionSharingConnectPeerRequest,
+  SessionSharingConnectPeerResponse,
+  SessionSharingDisconnectPeerRequest,
+  SessionSharingImportPeerSessionRequest,
+  SessionSharingImportPeerSessionResponse,
+  SessionSharingListPeerSessionsRequest,
+  SessionSharingListSessionsResponse,
+  SessionSharingLogEntry,
+  SessionSharingPreviewPeerSessionRequest,
+  SessionSharingPreviewResponse,
+  SessionSharingStartRequest,
+  SessionSharingStatus,
+} from "./session-sharing.js";
 import type { StorageCleanRequest, StorageCleanResult, StorageUsageSnapshot } from "./storage.js";
 import type {
   ArmsCustomEventPayload,
@@ -492,6 +507,30 @@ export const PlatformChannels = {
   MigrateLegacyCommonMcp: "zcode:migrate-legacy-common-mcp",
   /** Renderer → Main：获取当前设备的稳定标识符（deviceMid） */
   GetDeviceId: "zcode:get-device-id",
+  /** Renderer → Main：启动本机会话共享服务 */
+  StartSessionSharing: "zcode:start-session-sharing",
+  /** Renderer → Main：停止本机会话共享服务 */
+  StopSessionSharing: "zcode:stop-session-sharing",
+  /** Renderer → Main：查询本机会话共享状态 */
+  GetSessionSharingStatus: "zcode:get-session-sharing-status",
+  /** Renderer → Main：读取本机会话共享日志 */
+  GetSessionSharingLogs: "zcode:get-session-sharing-logs",
+  /** Renderer → Main：刷新会话共享连接码 */
+  RefreshSessionSharingCode: "zcode:refresh-session-sharing-code",
+  /** Renderer → Main：断开指定来源设备 */
+  DisconnectSessionSharingPeer: "zcode:disconnect-session-sharing-peer",
+  /** Main → Renderer：会话共享状态变化 */
+  SessionSharingStatusChanged: "zcode:session-sharing-status-changed",
+  /** Renderer → Main：连接另一台 ZCode 的共享服务 */
+  ConnectSessionSharingPeer: "zcode:connect-session-sharing-peer",
+  /** Renderer → Main：列出 peer 的会话 */
+  ListSessionSharingPeerSessions: "zcode:list-session-sharing-peer-sessions",
+  /** Renderer → Main：预览 peer 会话 */
+  PreviewSessionSharingPeerSession: "zcode:preview-session-sharing-peer-session",
+  /** Renderer → Main：导入 peer 会话到本地工作区 */
+  ImportSessionSharingPeerSession: "zcode:import-session-sharing-peer-session",
+  /** Renderer → Main：关闭 peer 连接 */
+  CloseSessionSharingPeer: "zcode:close-session-sharing-peer",
 } as const;
 
 export type PlatformChannelName = (typeof PlatformChannels)[keyof typeof PlatformChannels];
@@ -1308,6 +1347,54 @@ export interface PlatformChannelMap {
   };
   [PlatformChannels.SetTitleBarTheme]: {
     request: DesktopTitleBarTheme;
+    response: void;
+  };
+  [PlatformChannels.StartSessionSharing]: {
+    request: SessionSharingStartRequest;
+    response: SessionSharingStatus;
+  };
+  [PlatformChannels.StopSessionSharing]: {
+    request: void;
+    response: SessionSharingStatus;
+  };
+  [PlatformChannels.GetSessionSharingStatus]: {
+    request: void;
+    response: SessionSharingStatus;
+  };
+  [PlatformChannels.GetSessionSharingLogs]: {
+    request: void;
+    response: SessionSharingLogEntry[];
+  };
+  [PlatformChannels.RefreshSessionSharingCode]: {
+    request: void;
+    response: SessionSharingStatus;
+  };
+  [PlatformChannels.DisconnectSessionSharingPeer]: {
+    request: SessionSharingDisconnectPeerRequest;
+    response: SessionSharingStatus;
+  };
+  [PlatformChannels.SessionSharingStatusChanged]: {
+    request: SessionSharingStatus;
+    response: void;
+  };
+  [PlatformChannels.ConnectSessionSharingPeer]: {
+    request: SessionSharingConnectPeerRequest;
+    response: SessionSharingConnectPeerResponse;
+  };
+  [PlatformChannels.ListSessionSharingPeerSessions]: {
+    request: SessionSharingListPeerSessionsRequest;
+    response: SessionSharingListSessionsResponse;
+  };
+  [PlatformChannels.PreviewSessionSharingPeerSession]: {
+    request: SessionSharingPreviewPeerSessionRequest;
+    response: SessionSharingPreviewResponse;
+  };
+  [PlatformChannels.ImportSessionSharingPeerSession]: {
+    request: SessionSharingImportPeerSessionRequest;
+    response: SessionSharingImportPeerSessionResponse;
+  };
+  [PlatformChannels.CloseSessionSharingPeer]: {
+    request: SessionSharingClosePeerRequest;
     response: void;
   };
 }

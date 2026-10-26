@@ -88,8 +88,15 @@
 - `linux-unpacked/resources/glm/zcode.cjs` 是指向
   `apps/zcode-cli/packages/cli/dist/zcode.cjs` 的符号链接。
   因此 CLI/runtime 改动只需 `pnpm --dir apps/zcode-cli build` 后重启 App，无需重新打包或安装。
-- 若重打 AppImage（`pnpm --dir packages/desktop build`），electron-builder 会重建
-  `linux-unpacked` 并把符号链接覆盖为真实文件——需重跑：
+- `pnpm --dir packages/desktop build` 只产出 `out/`（prepare:runtime-assets + tsup/vite），
+  不跑 electron-builder；完整打包入口是
+  `pnpm --dir packages/desktop run bundle -- --os linux --arch x64`
+  （config 中 linux target 固定为 AppImage/deb/rpm/pacman，`bundle` 不支持过滤）。
+- 本机只编译 deb：本机无 `rpmbuild`（rpm 必失败），preview 只消费 `linux-unpacked`，
+  AppImage/pacman 均为浪费。在 `build` 产出 `out/` 后直接调 electron-builder 覆盖 target：
+  `cd packages/desktop && pnpm exec electron-builder --config electron-builder.config.js --linux deb --x64`
+  注意这会跳过 `bundle.mjs` 的 asar 依赖校验与体积审计，仅限本机迭代；出正式包仍走 `bundle`。
+- 任何 electron-builder 执行都会重建 `linux-unpacked` 并把符号链接覆盖为真实文件——需重跑：
   `ln -sf "$PWD/apps/zcode-cli/packages/cli/dist/zcode.cjs" packages/desktop/dist/linux-unpacked/resources/glm/zcode.cjs`
 - `packages/desktop/bundled-agents/<platform>/glm/zcode.cjs` 必须是真实文件，不要改成符号链接：
   `stage-agent-bundle.mjs` / `prepare:runtime-assets` 会用 `fs.copyFileSync` 写入该路径，
