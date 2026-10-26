@@ -39,6 +39,7 @@ import {
   parseAsarListWithPackState,
 } from "./scripts/desktop-native-package-policy.mjs";
 import { replaceAppAsarFromStaging } from "./scripts/app-asar-repack.mjs";
+import { assertRendererEntryPagePresent } from "./scripts/asar-renderer-integrity.mjs";
 import {
   patchNsisInstallSectionFile,
   restoreNsisInstallSectionFileSync,
@@ -454,6 +455,16 @@ function assertPackagedNativeResourcePolicy(context) {
   }
 }
 
+function assertPackagedRendererBundle(context) {
+  const appAsarPath = resolveAppAsarPath(context);
+  // renderer 入口页缺失时窗口会加载 index.html 直接 ERR_FILE_NOT_FOUND，表现为"进程都活着但界面空白"。
+  // 2026-10-26 Windows 构建曾把 vite 尚未写完的半成品 out/ 打进 asar（见 docs/asar-renderer-integrity-guard.md），
+  // 缺陷只能等用户装完才发现。afterPack 在 asar 定稿后强制校验含 renderer 入口页，缺失即打包失败。
+  assertRendererEntryPagePresent(
+    runAsarCommandAndReadStdout(["list", "--is-pack", appAsarPath]),
+  );
+}
+
 function assertPackagedNodePtyPrebuild(context) {
   const targetBinaryPath = resolvePackagedNodePtyPrebuildPath({
     resourcesDir: resolvePackagedResourcesDir(context),
@@ -671,6 +682,9 @@ export default {
     );
     runTimedSync("afterPack:assertPackagedNativeResourcePolicy", () =>
       assertPackagedNativeResourcePolicy(context),
+    );
+    runTimedSync("afterPack:assertPackagedRendererBundle", () =>
+      assertPackagedRendererBundle(context),
     );
     runTimedSync("afterPack:assertPackagedNodePtyPrebuild", () =>
       assertPackagedNodePtyPrebuild(context),
@@ -907,6 +921,13 @@ export default {
     // 与 /usr/share/icons/hicolor/*/apps/zcode.png 保持一致。
     executableName: desktopProductIdentity.linuxExecutableName,
     category: "Development",
+    // Electron 运行时的 Linux 桌面标识由 app.setDesktopName(runtimeDesktopName) 设为
+    // zcode / zcode-preview；这里同步 StartupWMClass，保证 X11 下 Dock 也能按启动器归组。
+    desktop: {
+      entry: {
+        StartupWMClass: desktopProductIdentity.linuxExecutableName,
+      },
+    },
     maintainer: "ZCode <dev@zcode.z.ai>",
   },
   deb: {
