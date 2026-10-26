@@ -2,6 +2,13 @@
 *.mjs text eol=lf
 *.sh  text eol=lf
 
+# Gen UI vendor 快照是字节精确的固定资源：构建期按 vendor/manifest.json 的
+# sha256 逐文件校验（packages/desktop/scripts/gen-ui-runtime-assets.mjs）。
+# autocrlf=true 的机器（Git for Windows 系统级默认）检出不受 -text 约束的
+# .js/.json/.LICENSE 等文件时会转 CRLF，哈希必然失配导致构建失败；钉 eol=lf
+# 强制工作树保持 LF，与机器 autocrlf 配置无关。
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/** text eol=lf
+
 # E2E PDF fixture 含规范 xref 尾空格，必须按二进制处理，避免 diff --check 误报。
 packages/desktop/test/e2e/fixtures/fs/**/*.pdf binary
 
