@@ -53,17 +53,15 @@ function CharCounter({
  * `~/.zcode/cli/memories/global/` 下的单条 Markdown 记忆。
  * 分字段编辑：name / description 落入 frontmatter，content 为正文（≤2048）。
  * name 留空表示回退显示名（default → 本地化"默认"，其余 → id）。
- * `disabled`（总开关关闭）时编辑器只读（仍可预览已存内容），保存按钮禁用。
+ * 2026-10-26 起总开关移除（全局记忆默认常开、不可关闭），不再有 disabled 门控。
  */
 export function GlobalMemoryEditor({
   memoryService,
   memoryId,
-  disabled,
   onSaved,
 }: {
   memoryService: GlobalMemoryEditorService;
   memoryId: string;
-  disabled: boolean;
   /** 保存成功后回调：宿主据此刻刷新列表（name/chars 可能已变化）。 */
   onSaved?: () => void;
 }) {
@@ -127,7 +125,6 @@ export function GlobalMemoryEditor({
 
   const handleSave = useCallback(async () => {
     if (
-      disabled ||
       contentDraft.length > GLOBAL_MEMORY_CHARACTER_LIMIT ||
       nameDraft.length > GLOBAL_MEMORY_NAME_CHARACTER_LIMIT ||
       descriptionDraft.length > GLOBAL_MEMORY_DESCRIPTION_CHARACTER_LIMIT
@@ -168,7 +165,7 @@ export function GlobalMemoryEditor({
     } finally {
       setSaving(false);
     }
-  }, [disabled, nameDraft, descriptionDraft, contentDraft, intl, memoryId, memoryService, onSaved]);
+  }, [nameDraft, descriptionDraft, contentDraft, intl, memoryId, memoryService, onSaved]);
 
   const charCount = contentDraft.length;
   const overLimit =
@@ -181,7 +178,7 @@ export function GlobalMemoryEditor({
     (nameDraft !== loaded.name ||
       descriptionDraft !== loaded.description ||
       contentDraft !== loaded.content);
-  const canSave = !disabled && !loading && !saving && !overLimit && dirty;
+  const canSave = !loading && !saving && !overLimit && dirty;
 
   const namePlaceholder =
     memoryId === GLOBAL_MEMORY_DEFAULT_ID
@@ -194,7 +191,7 @@ export function GlobalMemoryEditor({
         <Input
           value={nameDraft}
           onChange={(event) => setNameDraft(event.target.value)}
-          disabled={disabled || loading || saving}
+          disabled={loading || saving}
           placeholder={namePlaceholder}
           aria-label={intl.formatMessage({ id: "settings.memory.global.nameLabel" })}
           data-testid={`${TID_SETTINGS_MEMORY_GLOBAL_EDITOR}-name`}
@@ -203,7 +200,7 @@ export function GlobalMemoryEditor({
         <Input
           value={descriptionDraft}
           onChange={(event) => setDescriptionDraft(event.target.value)}
-          disabled={disabled || loading || saving}
+          disabled={loading || saving}
           placeholder={intl.formatMessage({ id: "settings.memory.global.descriptionPlaceholder" })}
           aria-label={intl.formatMessage({ id: "settings.memory.global.descriptionLabel" })}
           data-testid={`${TID_SETTINGS_MEMORY_GLOBAL_EDITOR}-description`}
@@ -222,7 +219,7 @@ export function GlobalMemoryEditor({
           }
         }}
         spellCheck={false}
-        disabled={disabled || loading || saving}
+        disabled={loading || saving}
         placeholder={intl.formatMessage({ id: "settings.memory.global.empty" })}
         className="min-h-48 w-full text-ui-base"
         aria-label={intl.formatMessage({ id: "settings.memory.global.editorLabel" })}

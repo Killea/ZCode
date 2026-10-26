@@ -83,6 +83,12 @@
 
 ## 本机构建与运行（桌面版）
 
+- **构建前必须推送（三台开发机通用）**：在 Linux / macOS / Windows 任一台开发机上更新
+  ZCode Preview（含重打 asar、electron-builder 出包、安装/替换应用）之前，必须先把当前仓库
+  的**所有**改动 `commit` 并 `push` 到 GitHub（`origin/dev_hank`），然后从远端拉取最新代码
+  再编译。**不允许有任何代码未推 GitHub 就参与编译**——三机的应用必须始终对应 GitHub 上
+  可追溯的 commit。执行前自查：`git status --porcelain` 为空，且
+  `git fetch origin && git merge-base --is-ancestor HEAD origin/dev_hank` 成立。
 - 桌面快捷方式 `~/Desktop/ZCode Preview.desktop` 直接指向解包二进制：
   `packages/desktop/dist/linux-unpacked/zcode-preview --no-sandbox`，不走 AppImage。
 - `linux-unpacked/resources/glm/zcode.cjs` 是指向

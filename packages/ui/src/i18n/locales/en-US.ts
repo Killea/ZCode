@@ -2496,9 +2496,7 @@ const enUS: Record<string, string> = {
   "settings.memory.workspaceMemory": "Workspace Memory",
   "settings.memory.tab.workspace": "Workspace Memory",
   "settings.memory.tab.global": "Global Memory",
-  "settings.memory.global.switchTitle": "Global Memory",
-  "settings.memory.global.description":
-    "Markdown memories shared across all workspaces (up to 2048 characters each, up to 10 entries). Select them per message in the composer; the agent edits them only when you ask.",
+  // 2026-10-26: global memory master switch removed (always on by default); switchTitle/description keys deleted.
   "settings.memory.global.editorLabel": "Global memory content",
   "settings.memory.global.charCount": "{count} / {limit} characters",
   "settings.memory.global.empty": "No global memory yet. Write shared context here.",

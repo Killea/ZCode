@@ -2017,7 +2017,7 @@ describe("createZCodeAgentService", () => {
         nativeSearchEnhancementsEnabled: boolean;
         subagentRuntimeConfigEnabled: boolean;
         memoryEnabled: boolean;
-        globalMemoryEnabled: boolean;
+        // globalMemoryEnabled 已于 2026-10-26 移除：全局记忆默认常开，Host 响应不再携带该字段。
         modelContextBudgetStrategy: "legacy" | "preflight-v1";
       };
       expectedErrorCode?: number;
@@ -2035,7 +2035,6 @@ describe("createZCodeAgentService", () => {
           nativeSearchEnhancementsEnabled: false,
           subagentRuntimeConfigEnabled: false,
           memoryEnabled: false,
-          globalMemoryEnabled: false,
           modelContextBudgetStrategy: "preflight-v1" as const,
         },
         expectedResolverCalls: 1,
@@ -2047,7 +2046,6 @@ describe("createZCodeAgentService", () => {
           nativeSearchEnhancementsEnabled: true,
           subagentRuntimeConfigEnabled: false,
           memoryEnabled: false,
-          globalMemoryEnabled: false,
           modelContextBudgetStrategy: "preflight-v1" as const,
         },
         expectedResolverCalls: 0,

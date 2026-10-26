@@ -189,26 +189,24 @@ function createService(): MemoryCatalogService {
   };
 }
 
+// 2026-10-26 起移除全局记忆总开关（默认常开、不可关闭），组件不再接收
+// globalMemoryEnabled / onGlobalMemoryEnabledChange props。
 function renderSection(
   memoryService: MemoryCatalogService,
   memoryEnabled = true,
   workspaceDisplayNames: readonly string[] = [],
-  globalMemoryEnabled = true,
 ) {
   const onMemoryEnabledChange = vi.fn(async () => {});
-  const onGlobalMemoryEnabledChange = vi.fn(async () => {});
   render(
     createElement(MemorySettingsSection, {
       memoryEnabled,
       memoryService,
       onMemoryEnabledChange,
-      globalMemoryEnabled,
-      onGlobalMemoryEnabledChange,
       projectMemoryViewerAvailable: true,
       workspaceDisplayNames,
     }),
   );
-  return { onMemoryEnabledChange, onGlobalMemoryEnabledChange };
+  return { onMemoryEnabledChange };
 }
 
 afterEach(() => {
@@ -493,19 +491,21 @@ describe("MemorySettingsSection 全局记忆", () => {
     );
   });
 
-  it("总开关关闭时仍可查看列表但编辑/新建/删除禁用", async () => {
+  // 2026-10-26 起总开关移除（默认常开、不可关闭）：列表恒可编辑，
+  // 新建/删除按钮不存在受开关门控的禁用态。
+  it("总开关移除后列表恒可编辑：新建/删除始终可用", async () => {
     const memoryService = createService();
-    renderSection(memoryService, true, [], false);
+    renderSection(memoryService);
     await switchToGlobalTab();
     expect(
       await screen.findByTestId(`${TID_SETTINGS_GLOBAL_MEMORY_LIST}-item-default`),
     ).toBeTruthy();
     expect(
       (screen.getByTestId(TID_SETTINGS_GLOBAL_MEMORY_CREATE) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    ).toBe(false);
     expect(
       (screen.getByTestId(`${TID_SETTINGS_GLOBAL_MEMORY_DELETE}-default`) as HTMLButtonElement)
         .disabled,
-    ).toBe(true);
+    ).toBe(false);
   });
 });

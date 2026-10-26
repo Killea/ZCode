@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type IMemoryService, type ProjectMemoryWorkspaceSummary } from "@zcode/services";
-import { TID_SETTINGS_MEMORY_GLOBAL_SWITCH, TID_SETTINGS_MEMORY_SWITCH } from "@zcode/shared";
+import { TID_SETTINGS_MEMORY_SWITCH } from "@zcode/shared";
 import { runUserAction, runUserActionAsync } from "@/lib/userActionTelemetry.js";
 import { Switch } from "@/components/ui/switch.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
@@ -57,16 +57,13 @@ export function MemorySettingsSection({
   memoryEnabled,
   memoryService,
   onMemoryEnabledChange,
-  globalMemoryEnabled,
-  onGlobalMemoryEnabledChange,
   projectMemoryViewerAvailable,
   workspaceDisplayNames = [],
 }: {
   memoryEnabled: boolean;
   memoryService: MemoryCatalogService;
   onMemoryEnabledChange: (enabled: boolean) => Promise<void>;
-  globalMemoryEnabled: boolean;
-  onGlobalMemoryEnabledChange: (enabled: boolean) => Promise<void>;
+  // 2026-10-26 起全局记忆默认常开、无总开关（docs/global-memory-multi.md 规则 10）。
   projectMemoryViewerAvailable: boolean;
   workspaceDisplayNames?: readonly string[];
 }) {
@@ -243,31 +240,10 @@ export function MemorySettingsSection({
         </div>
       ) : (
         <div className="space-y-6">
+          {/* 2026-10-26 起移除全局记忆总开关：默认常开、不可关闭
+              （docs/global-memory-multi.md 规则 10），记忆列表恒可编辑。 */}
           <SettingsGroupCard>
-            <SettingsRow
-              label={intl.formatMessage({
-                id: "settings.memory.global.switchTitle",
-              })}
-              description={intl.formatMessage({
-                id: "settings.memory.global.description",
-              })}
-              control={
-                <Switch
-                  aria-label={intl.formatMessage({
-                    id: "settings.memory.global.switchTitle",
-                  })}
-                  checked={globalMemoryEnabled}
-                  data-testid={TID_SETTINGS_MEMORY_GLOBAL_SWITCH}
-                  onCheckedChange={(checked) => {
-                    void onGlobalMemoryEnabledChange(checked);
-                  }}
-                />
-              }
-            />
-          </SettingsGroupCard>
-
-          <SettingsGroupCard>
-            <GlobalMemoryManager memoryService={memoryService} disabled={!globalMemoryEnabled} />
+            <GlobalMemoryManager memoryService={memoryService} />
           </SettingsGroupCard>
         </div>
       )}

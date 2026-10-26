@@ -44,7 +44,7 @@ last_updated: 2026-04-30
    - ids 缺失 + `includeGlobalMemory: true` → `["default"]`（旧客户端兼容）；
    - ids 与 bool 均缺失 → 不注入。
 9. **无效 id 静默跳过**：重复去重（保序）、已删除/非法 id 不报错、不阻断 turn；全部无效 → 不注入，不生成空段。
-10. **全局设置仍是总闸门**：`AppSettings.globalMemoryEnabled = false` 时 composer 不渲染 picker，CLI 不注入（`resolveEnabledGlobalMemoryDir` 已覆盖 taskType 门）。
+10. **全局记忆默认常开，不提供关闭开关**（2026-10-26 起）：`AppSettings.globalMemoryEnabled` 总开关整体移除——设置页开关、`AppSettings` 协议字段、`ZCodeSessionRuntimePreferencesResult.globalMemoryEnabled` 字段、host→CLI 运行时门控全部删除；desktop 链路 CLI `runtimeConfig.memory.globalEnabled` 恒为 `true`，CLI 总是读取记忆目录并可用。唯一用户控制点是 composer 逐条 opt-in（空选择 = 本轮不注入）。旧持久化 settings 中的 `globalMemoryEnabled` 键在解析边界被忽略（未知字段剥离）；旧 intent/row 的 `includeGlobalMemory` 布尔兼容分支保留不变。TUI/CLI 独立链路（本就没有此开关）行为不变。
 11. **排序**：`default` 固定列表首位，其余按 `name` localeCompare + id 兜底——与 updatedAt 抖动解耦，列表确定。
 12. **创建**：UI 只填 name（+可选 description/content）；slug 由服务从 name 规范化派生，冲突自动追加 `-2`/`-3`…直至唯一。
 13. **空记忆**：body 为空的条目照常出现在列表与 picker；注入时按空块处理。
@@ -133,7 +133,7 @@ deleteGlobalMemory({id}): Promise<void>
 
 ### Composer — `V4ComposerMemoryPicker`
 
-- `globalMemoryEnabled` 且 memoryService 可用 → 渲染 Brain 图标按钮 + 勾选计数 badge；`data-testid="v4-composer-memory-picker"`。
+- memoryService 可用即渲染 Brain 图标按钮 + 勾选计数 badge（无总开关门控，2026-10-26 起恒显）；`data-testid="v4-composer-memory-picker"`。
 - DropdownMenu 打开时 `listGlobalMemories()` 拉取最新清单；`DropdownMenuCheckboxItem` 逐条；第 5 项勾选时未选项 disabled（上限 4）。
 - `ConversationComposer` 状态 `globalMemorySelectedIds: ReadonlySet<string>`（替代 `globalMemoryOptIn`）；发送 payload `includedGlobalMemoryIds: [...ids]`（空集不写字段），随 `...submission` 扩散到全部 sendText 站点；**发送成功复位为空集**（沿用 optIn 复位点）。
 - `ComposerSubmissionConfig.includedGlobalMemoryIds?: string[]`——发送方冻结，与 includeGlobalMemory 同生命周期。
@@ -147,7 +147,7 @@ deleteGlobalMemory({id}): Promise<void>
 - 新建：inline 表单 name + description + content；`data-testid="settings-global-memory-create"`。新建期间列表不保留选中高亮、已选条目编辑器收起；点击列表条目视为放弃新建并切换选中。
 - 点击条目进入编辑（`GlobalMemoryEditor` 按 `memoryId` 泛化：name/description/content 三字段 + 2048 计数 + 保存）。
 - 删除：AlertDialog 确认；`default` 亦可删（删 MEMORY.md）。
-- 总开关关闭时列表禁用态沿用 `GlobalMemoryEditor` 现状。
+- 无总开关（2026-10-26 起移除）：列表恒可编辑，`GlobalMemoryManager` 不再有 `disabled` 门控。
 
 ## 明确不做
 

@@ -434,11 +434,6 @@ export interface ConversationComposerProps {
   highspeedActivationCardId?: string | null;
   onHighspeedActivationApplied?: (cardId: string) => void;
   /**
-   * 全局（跨工作区）记忆总开关；开启后 composer 展示逐条 opt-in 的"全局记忆"开关，
-   * 默认关闭，发送一次后自动复位。关闭时该开关完全不显示。
-   */
-  globalMemoryEnabled?: boolean;
-  /**
    * 是否在新建任务 / 切换会话 / 挂载后自动把光标聚焦到输入框（默认开）。
    * 竖切多 pane 时由宿主传入 SessionPane.focused，仅焦点 pane 聚焦、后台 pane 不抢焦点。
    */
@@ -550,7 +545,8 @@ function ConversationComposerImpl({
   centered = false,
   blockingRequestId = null,
   disabled = false,
-  globalMemoryEnabled = false,
+  // globalMemoryEnabled 已于 2026-10-26 移除：全局记忆默认常开、无总开关
+  // （docs/global-memory-multi.md 规则 10），memory picker 恒显示。
   highspeedCard = null,
   highspeedActivationCardId = null,
   onHighspeedActivationApplied,
@@ -1608,9 +1604,9 @@ function ConversationComposerImpl({
             : {}),
           telemetrySeed,
           // 逐条 opt-in：仅本次显式选中的记忆随消息携带（ids 有序）；发送后复位为空集。
-          // 勾选后中途关闭总开关的残留选择不随消息携带（CLI 同样会丢弃，但 wire
-          // 上不应发出与开关矛盾的意图）。
-          ...(globalMemoryEnabled && globalMemorySelectedIds.size > 0
+          // 2026-10-26 起总开关移除（全局记忆默认常开，docs/global-memory-multi.md 规则 10），
+          // 勾选即随消息携带，不再受任何开关门控。
+          ...(globalMemorySelectedIds.size > 0
             ? { includedGlobalMemoryIds: [...globalMemorySelectedIds] }
             : {}),
           ...(requestedDelivery ? { requestedDelivery } : {}),
@@ -1721,7 +1717,6 @@ function ConversationComposerImpl({
       conversationTelemetry,
       draftConfig,
       createSubmissionFromComposer,
-      globalMemoryEnabled,
       globalMemorySelectedIds,
       submissionReady,
       getCodeCommentContexts,
@@ -2477,18 +2472,17 @@ function ConversationComposerImpl({
           onConfigPickerOpenChange={handleConfigPickerOpenChange}
           onSwitchMode={onSwitchMode}
         />
-        {/* 全局记忆逐条 opt-in：仅总开关开启时显示 picker；默认空集，发送后自动复位。 */}
-        {globalMemoryEnabled ? (
-          <V4ComposerMemoryPicker
-            memories={globalMemoryEntries}
-            loading={globalMemoryListState.loading}
-            error={globalMemoryListState.error}
-            selectedIds={globalMemorySelectedIds}
-            onToggle={handleToggleGlobalMemory}
-            onMenuOpenChange={handleMemoryMenuOpenChange}
-            disabled={disabled}
-          />
-        ) : null}
+        {/* 全局记忆逐条 opt-in：2026-10-26 起总开关移除（默认常开，
+            docs/global-memory-multi.md 规则 10），picker 恒显示；默认空集，发送后自动复位。 */}
+        <V4ComposerMemoryPicker
+          memories={globalMemoryEntries}
+          loading={globalMemoryListState.loading}
+          error={globalMemoryListState.error}
+          selectedIds={globalMemorySelectedIds}
+          onToggle={handleToggleGlobalMemory}
+          onMenuOpenChange={handleMemoryMenuOpenChange}
+          disabled={disabled}
+        />
         {/* 最近 3 条用户 prompt 的 peek 图标：hover 即可回看当前 session 在做什么。 */}
         <V4ComposerRecentPromptsHint items={recentPromptItems} />
         {/* MCP/插件推荐选择器（Tools Picker）：逐条 opt-in，发送成功复位；
@@ -2529,7 +2523,6 @@ function ConversationComposerImpl({
       configPickerScopeKey,
       disabled,
       draftConfig,
-      globalMemoryEnabled,
       globalMemoryEntries,
       globalMemoryListState,
       globalMemorySelectedIds,

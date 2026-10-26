@@ -2072,7 +2072,8 @@ export const zcodeSessionRuntimePreferencesResultSchema = z
     nativeSearchEnhancementsEnabled: z.boolean(),
     subagentRuntimeConfigEnabled: z.boolean().optional(),
     memoryEnabled: z.boolean().default(false),
-    globalMemoryEnabled: z.boolean().default(false),
+    // 2026-10-26 起移除 globalMemoryEnabled：全局记忆默认常开、不可关闭，
+    // CLI 侧不再由 Host 下发该开关（见 docs/global-memory-multi.md 规则 10）。
     askUserQuestionAutoResolutionEnabled: z.boolean().default(true),
     integratedTerminalShell: integratedTerminalShellSelectionSchema.optional(),
     // 兼容旧 Host：缺少字段时在协议解析边界使用当前默认策略。

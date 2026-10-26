@@ -352,8 +352,6 @@ export interface AppSettings {
   nativeSearchEnhancementsEnabled?: boolean;
   /** 新建或冷恢复 Session 是否启用 Memory；默认关闭。 */
   memoryEnabled?: boolean;
-  /** 是否启用全局（跨工作区）记忆，总开关；默认关闭。开启后才注入上下文并允许在 UI/主 agent 编辑。 */
-  globalMemoryEnabled?: boolean;
   /**
    * 新任务缺省权限模式（composer 无 Recent 历史时的起稿来源）；fork 缺省 yolo。
    * 未知值在读取边界降级为缺省（见 validationAppSettings），不影响整份设置。

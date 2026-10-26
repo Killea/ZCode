@@ -53,14 +53,12 @@ function formatUpdatedAt(value: number | null): string | null {
 /**
  * 全局记忆管理器：目录下多条 Markdown 记忆的列表/新建/删除/编辑承载。
  * 列表排序由服务层保证（default 固定首位）；选中行展开 GlobalMemoryEditor。
- * `disabled`（总开关关闭）时保留只读列表预览，编辑/新建/删除均禁用。
+ * 2026-10-26 起总开关移除（全局记忆默认常开、不可关闭），不再有 disabled 门控。
  */
 export function GlobalMemoryManager({
   memoryService,
-  disabled,
 }: {
   memoryService: GlobalMemoryManagerService;
-  disabled: boolean;
 }) {
   const { intl } = useZCodeIntl();
   const [entries, setEntries] = useState<readonly GlobalMemoryEntryMeta[]>([]);
@@ -215,7 +213,7 @@ export function GlobalMemoryManager({
           type="button"
           variant="ghost"
           size="sm"
-          disabled={disabled || creating}
+          disabled={creating}
           data-testid={TID_SETTINGS_GLOBAL_MEMORY_CREATE}
           onClick={() =>
             runUserAction({
@@ -312,7 +310,6 @@ export function GlobalMemoryManager({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    disabled={disabled}
                     aria-label={intl.formatMessage({ id: "settings.memory.global.delete" })}
                     data-testid={`${TID_SETTINGS_GLOBAL_MEMORY_DELETE}-${entry.id}`}
                     className="size-7 shrink-0 text-foreground-subtle hover:text-destructive"
@@ -352,7 +349,6 @@ export function GlobalMemoryManager({
           key={selectedEntry.id}
           memoryService={memoryService}
           memoryId={selectedEntry.id}
-          disabled={disabled}
           onSaved={() => void refresh()}
         />
       ) : null}

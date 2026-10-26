@@ -2188,7 +2188,8 @@ export function createLocalServices(options: {
                 settings.askUserQuestionAutoResolutionEnabled !== false,
               nativeSearchEnhancementsEnabled: settings.nativeSearchEnhancementsEnabled !== false,
               memoryEnabled: settings.memoryEnabled === true,
-              globalMemoryEnabled: settings.globalMemoryEnabled === true,
+              // globalMemoryEnabled 已于 2026-10-26 移除（全局记忆默认常开、不可关闭）；
+              // 见 docs/global-memory-multi.md 规则 10 与 zcode-protocol 的 result schema。
               modelContextBudgetStrategy,
               // user-execution 只消费 Shell；共享默认策略是统一 result schema 的兼容占位，
               // 不会覆盖 runtime-materialization 阶段已经固定的 strategy。

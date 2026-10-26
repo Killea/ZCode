@@ -2348,9 +2348,7 @@ const zhCN: Record<string, string> = {
   "settings.memory.workspaceMemory": "工作区记忆",
   "settings.memory.tab.workspace": "工作区记忆",
   "settings.memory.tab.global": "全局记忆",
-  "settings.memory.global.switchTitle": "全局记忆",
-  "settings.memory.global.description":
-    "跨所有工作区共享的多条 Markdown 记忆（每条最多 2048 字符，最多 10 条）。在输入框按消息勾选注入；agent 仅在你明确要求时编辑。",
+  // 2026-10-26 起移除全局记忆总开关（默认常开、不可关闭），switchTitle/description 两键一并删除。
   "settings.memory.global.editorLabel": "全局记忆内容",
   "settings.memory.global.charCount": "{count} / {limit} 字符",
   "settings.memory.global.empty": "暂无全局记忆。在此填写跨工作区共享的上下文。",

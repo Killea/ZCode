@@ -539,7 +539,6 @@ describe("remote workspace host service wiring", () => {
               askUserQuestionAutoResolutionEnabled: false,
               nativeSearchEnhancementsEnabled: false,
               memoryEnabled: false,
-              globalMemoryEnabled: false,
               modelContextBudgetStrategy: "preflight-v1",
             },
           },
@@ -564,7 +563,6 @@ describe("remote workspace host service wiring", () => {
               askUserQuestionAutoResolutionEnabled: false,
               nativeSearchEnhancementsEnabled: false,
               memoryEnabled: false,
-              globalMemoryEnabled: false,
               modelContextBudgetStrategy: "preflight-v1",
               integratedTerminalShell: {
                 mode: "shell",
@@ -632,7 +630,6 @@ describe("remote workspace host service wiring", () => {
             askUserQuestionAutoResolutionEnabled: false,
             nativeSearchEnhancementsEnabled: false,
             memoryEnabled: false,
-            globalMemoryEnabled: false,
             modelContextBudgetStrategy: "preflight-v1",
           },
         },

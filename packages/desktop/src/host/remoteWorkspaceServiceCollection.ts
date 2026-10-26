@@ -327,7 +327,7 @@ export function createRemoteWorkspaceServiceCollection(params: {
                 settings.askUserQuestionAutoResolutionEnabled !== false,
               nativeSearchEnhancementsEnabled: settings.nativeSearchEnhancementsEnabled !== false,
               memoryEnabled: settings.memoryEnabled === true,
-              globalMemoryEnabled: settings.globalMemoryEnabled === true,
+              // globalMemoryEnabled 已于 2026-10-26 移除（全局记忆默认常开、不可关闭）。
               modelContextBudgetStrategy,
               // remote workspace 与本地 Host 保持同一 scope 边界，首次执行不得再次等待 client config。
               ...(request.scope === "user-execution" && settings.integratedTerminalShell

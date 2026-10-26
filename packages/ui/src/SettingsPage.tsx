@@ -732,7 +732,6 @@ export function SettingsPage({
     return [...names];
   }, [sharedSettings?.recentProjects, workspaceTabs]);
   const memoryEnabled = sharedSettings?.memoryEnabled === true;
-  const globalMemoryEnabled = sharedSettings?.globalMemoryEnabled === true;
   const nativeSearchEnhancementsEnabled = sharedSettings?.nativeSearchEnhancementsEnabled !== false;
   const askUserQuestionAutoResolutionEnabled =
     sharedSettings?.askUserQuestionAutoResolutionEnabled !== false;
@@ -1000,23 +999,8 @@ export function SettingsPage({
     },
     [updateSharedSettings],
   );
-  const handleGlobalMemoryEnabledChange = useCallback(
-    async (enabled: boolean) => {
-      await runSettingsActionAsync({
-        featureId: "settings.memory",
-        action: "toggle_global_memory",
-        trigger: "switch",
-        operation: async () => {
-          await updateSharedSettings({ globalMemoryEnabled: enabled });
-        },
-        completed: {
-          resultSource: "shared_settings",
-          stateAfter: enabled ? "enabled" : "disabled",
-        },
-      });
-    },
-    [updateSharedSettings],
-  );
+  // 2026-10-26 起移除 handleGlobalMemoryEnabledChange：全局记忆默认常开、无总开关
+  // （docs/global-memory-multi.md 规则 10），AppSettings.globalMemoryEnabled 已删除。
   const handleHttpProxyChange = useCallback(
     async (proxy: string) => {
       const normalizedProxy = proxy.trim();
@@ -1917,8 +1901,6 @@ export function SettingsPage({
                               memoryEnabled={memoryEnabled}
                               memoryService={localHostServices.memoryService}
                               onMemoryEnabledChange={handleMemoryEnabledChange}
-                              globalMemoryEnabled={globalMemoryEnabled}
-                              onGlobalMemoryEnabledChange={handleGlobalMemoryEnabledChange}
                               projectMemoryViewerAvailable={Boolean(isDesktop)}
                               workspaceDisplayNames={memoryWorkspaceDisplayNames}
                             />

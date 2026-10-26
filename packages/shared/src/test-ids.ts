@@ -388,8 +388,7 @@ export const TID_RESOURCE_MANAGER_STORAGE_CONFIRM_CANCEL =
   "resource-manager-storage-confirm-cancel";
 /** Memory 设置模块中的总开关 */
 export const TID_SETTINGS_MEMORY_SWITCH = "settings-memory-switch";
-/** 全局记忆 Tab 的总开关 */
-export const TID_SETTINGS_MEMORY_GLOBAL_SWITCH = "settings-memory-global-switch";
+// 2026-10-26 起移除 TID_SETTINGS_MEMORY_GLOBAL_SWITCH（全局记忆总开关删除，默认常开、不可关闭）。
 /** 全局记忆编辑框 */
 export const TID_SETTINGS_MEMORY_GLOBAL_EDITOR = "settings-memory-global-editor";
 /** 全局记忆保存按钮 */

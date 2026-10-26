@@ -158,7 +158,8 @@ type ZCodeSessionRecordParams = (
 interface SessionStartupPreferences {
   subagentRuntimeConfigEnabled?: boolean;
   memoryEnabled: boolean;
-  globalMemoryEnabled: boolean;
+  // globalMemoryEnabled 已于 2026-10-26 移除（全局记忆默认常开、不可关闭）；
+  // 会话创建时 runtimeConfig.memory.globalEnabled 恒为 true。
   modelContextBudgetStrategy: ZCodeModelContextBudgetStrategy;
   nativeSearchEnhancementsEnabled: boolean;
   resolveInitialBashShellSelection: () => Promise<ExecutionShellSelection | undefined>;
@@ -3254,7 +3255,7 @@ async function requestSessionRuntimePreferences(
       return {
         askUserQuestionAutoResolutionEnabled: true,
         memoryEnabled: false,
-        globalMemoryEnabled: false,
+        // 无 Host 的纯 CLI 创建路径：全局记忆同样默认常开（2026-10-26 起无开关）。
         modelContextBudgetStrategy: DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
         nativeSearchEnhancementsEnabled: true,
       };
@@ -3273,7 +3274,6 @@ async function resolveSessionStartupPreferences(
     const inheritedShellSelection = source.parent.app.runtime.getSessionShellSelection();
     return {
       memoryEnabled: source.parent.memoryEnabled,
-      globalMemoryEnabled: source.parent.globalMemoryEnabled,
       subagentRuntimeConfigEnabled: source.parent.subagentRuntimeConfigEnabled,
       modelContextBudgetStrategy: DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
       nativeSearchEnhancementsEnabled: source.parent.nativeSearchEnhancementsEnabled,
@@ -3294,7 +3294,6 @@ async function resolveSessionStartupPreferences(
   return {
     subagentRuntimeConfigEnabled: runtimePreferences.subagentRuntimeConfigEnabled,
     memoryEnabled: runtimePreferences.memoryEnabled,
-    globalMemoryEnabled: runtimePreferences.globalMemoryEnabled,
     modelContextBudgetStrategy: DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
     nativeSearchEnhancementsEnabled: runtimePreferences.nativeSearchEnhancementsEnabled,
     resolveInitialBashShellSelection: async () => {
@@ -3393,10 +3392,11 @@ async function createRecord(
       modelContextBudgetStrategy: startupPreferences.modelContextBudgetStrategy,
       // Memory Settings 是现有 CLI features.memory/use 之外的总开关。只在关闭时
       // 写入 override，避免开启值反向覆盖用户已有的 CLI 禁用配置。
-      // globalEnabled 是独立总开关，安全默认 false，可无条件写出（不触碰 enabled 的 fallback）。
+      // 2026-10-26 起全局记忆默认常开、不提供关闭开关（docs/global-memory-multi.md
+      // 规则 10）：globalEnabled 不再由 Host 设置下发，协议 app-server 链路恒为 true。
       memory: {
         ...(startupPreferences.memoryEnabled ? {} : { enabled: false }),
-        globalEnabled: startupPreferences.globalMemoryEnabled,
+        globalEnabled: true,
       },
       // desktop-continuous session/create 由 UI 先解析 ~/.zcode/.agents 的 enabled MCP，
       // 但 protocol app-server 自己不会读取 UI/main 侧的 MCP store；之前 createRecord 没把
@@ -3475,7 +3475,6 @@ async function createRecord(
     createdAt: now,
     eventStore,
     memoryEnabled: startupPreferences.memoryEnabled,
-    globalMemoryEnabled: startupPreferences.globalMemoryEnabled,
     subagentRuntimeConfigEnabled: startupPreferences.subagentRuntimeConfigEnabled,
     modelContextBudgetStrategy: startupPreferences.modelContextBudgetStrategy,
     nativeSearchEnhancementsEnabled: startupPreferences.nativeSearchEnhancementsEnabled,

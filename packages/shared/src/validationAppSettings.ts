@@ -516,7 +516,8 @@ const appSettingsObjectSchema = z.object({
   onboardingOccupation: appSettingsOccupationSchema.nullish(),
   proactiveSuggestionsEnabled: z.boolean().optional(),
   memoryEnabled: z.boolean().default(false),
-  globalMemoryEnabled: z.boolean().default(false),
+  // 2026-10-26 起移除 globalMemoryEnabled 总开关（全局记忆默认常开、不可关闭，
+  // 见 docs/global-memory-multi.md 规则 10）；旧持久化设置中的该键按未知字段剥离。
   defaultSessionMode: defaultSessionModeSettingSchema,
   lastWorkspaceSession: z.array(appWorkspaceSessionEntrySchema).default([]),
   lastActiveTabIndex: z.number().int().nonnegative().default(0),
@@ -611,7 +612,6 @@ export const appSettingsPatchSchema = z.object({
     .nullish(),
   proactiveSuggestionsEnabled: z.boolean().optional(),
   memoryEnabled: z.boolean().optional(),
-  globalMemoryEnabled: z.boolean().optional(),
   defaultSessionMode: zcodeDefaultSessionModeSchema.optional(),
   lastWorkspaceSession: z.array(appWorkspaceSessionEntrySchema).optional(),
   lastActiveTabIndex: z.number().int().nonnegative().optional(),
