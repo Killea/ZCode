@@ -184,6 +184,7 @@ export class ModelPropertiesConfig extends ConfigOverlay<ModelPropertiesConfig> 
   readonly supportsNativeWebSearch?: ModelPropertiesConfigInput["supportsNativeWebSearch"];
   readonly supportsMidConversationSystem?: ModelPropertiesConfigInput["supportsMidConversationSystem"];
   readonly streamIdleTimeoutMs?: ModelPropertiesConfigInput["streamIdleTimeoutMs"];
+  readonly maxVisionTokens?: ModelPropertiesConfigInput["maxVisionTokens"];
 
   constructor(input: ModelPropertiesConfigInput = {}) {
     super();
@@ -224,6 +225,7 @@ export class ModelPropertiesConfig extends ConfigOverlay<ModelPropertiesConfig> 
         next.supportsMidConversationSystem,
       ),
       streamIdleTimeoutMs: this.overlayValue(this.streamIdleTimeoutMs, next.streamIdleTimeoutMs),
+      maxVisionTokens: this.overlayValue(this.maxVisionTokens, next.maxVisionTokens),
     });
   }
 
@@ -242,6 +244,7 @@ export class ModelPropertiesConfig extends ConfigOverlay<ModelPropertiesConfig> 
       supportsNativeWebSearch: this.supportsNativeWebSearch,
       supportsMidConversationSystem: this.supportsMidConversationSystem,
       streamIdleTimeoutMs: this.streamIdleTimeoutMs,
+      maxVisionTokens: this.maxVisionTokens,
     });
   }
 }

@@ -81,6 +81,12 @@ export const completeModelPropertiesDataSchema = z
      * 见 docs/model-stream-idle-timeout.md。
      */
     streamIdleTimeoutMs: z.number().int().positive().optional(),
+    /**
+     * provider 公布的单请求视觉 token 上限（可选，如 ninfer `max_vision_tokens`）。
+     * 配置后媒体预算投影在字节口径之外按图片尺寸折算 token 做第二约束；
+     * 缺省只执行字节预算。
+     */
+    maxVisionTokens: z.number().int().positive().optional(),
   })
   .strict();
 export const modelPropertiesDataSchema = z

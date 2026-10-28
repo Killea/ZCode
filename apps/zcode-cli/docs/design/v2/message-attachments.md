@@ -94,6 +94,16 @@ Desktop 专用媒体 scheme 必须在 `app.ready` 前以 `standard + secure + st
 `moov` 位于 `mdat` 之后的视频会在已发送消息中被媒体栈误判为不可解码。正式 VI06 E2E 使用
 尾部 `moov` 的可播 MP4，同时验证 artifact-backed 与超过 30MiB local-ref 视频的加载和 seek。
 
+Status update as of 2026-10-28: 媒体预算投影在字节口径之外增加视觉 token 第二约束。模型
+`properties.maxVisionTokens` 表达 provider 公布的单请求视觉 token 上限（如 ninfer
+`/v1/models` 的 `max_vision_tokens`）；配置后每张 image block 按像素尺寸折算
+`ceil(w/32) × ceil(h/32)` merged vision tokens（ninfer 32px 合并粒度），历史媒体按新旧倒序
+填充时须同时满足字节与 token 预算，任一超限即丢弃最旧媒体；最新真实用户消息媒体超过任一
+预算仍走既有 `MEDIA_BUDGET_CURRENT_ATTACHMENT_TOO_LARGE` 本地拒绝路径。video 与无法从
+data URL 头部解析尺寸的媒体不计 token，只受字节预算约束——该估算是有损下限，provider 真实
+计费可能更高，字节预算仍是兜底。未配置 `maxVisionTokens` 的模型完全保持字节口径，
+不做头部解码。
+
 ## 设计要点
 
 ### 输入层

@@ -64,6 +64,7 @@ export async function runMemoryAgentLoop(input: {
     const mediaProjection = projectMessagesForModelMediaPolicy(
       messages.map(cloneModelMessage),
       input.model.properties.inputFormat,
+      { maxVisionTokens: input.model.properties.maxVisionTokens },
     );
     const request: ModelRequest = {
       abortSignal: input.abortSignal,

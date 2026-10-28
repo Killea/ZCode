@@ -326,6 +326,7 @@ async function compactActiveConversationImpl(
         const mediaPolicyProjection = projectMessagesForModelMediaPolicy(
           requestMessages,
           compactModel.properties.inputFormat,
+          { maxVisionTokens: compactModel.properties.maxVisionTokens },
         );
         logMediaCapabilityProjection(
           this.logger,
@@ -353,6 +354,7 @@ async function compactActiveConversationImpl(
             : projectMessagesForModelMediaPolicy(
                 recordableRequestMessages,
                 compactModel.properties.inputFormat,
+                { maxVisionTokens: compactModel.properties.maxVisionTokens },
               ).messages;
         if (stripMediaForSummary) {
           // 复用通用 media budget 文案会污染 summary 的 provider-visible 内容。

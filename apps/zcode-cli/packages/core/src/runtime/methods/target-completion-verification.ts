@@ -149,6 +149,7 @@ async function verifyTargetCompletion(
   const messages = projectMessagesForModelMediaPolicy(
     providerMessages,
     model.properties.inputFormat,
+    { maxVisionTokens: model.properties.maxVisionTokens },
   ).messages;
   const modelRequestEvent = this.createEvent(
     SessionEventType.ModelRequest,

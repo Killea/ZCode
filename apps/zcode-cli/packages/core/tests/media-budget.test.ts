@@ -687,3 +687,171 @@ it("honors explicit absence of a genuine user without guessing from provider use
   );
   expect(result.omittedMediaCount).toBe(1);
 });
+
+describe("model request media vision token budget", () => {
+  // ninfer merged vision token = 32×32 像素（2×2 个 16px patch）。
+  // 1920×1080 → ceil(1920/32) × ceil(1080/32) = 60 × 34 = 2040 tokens。
+  const TOKENS_1080P = 2040;
+
+  it("counts merged vision tokens from image pixel dimensions", () => {
+    const result = projectMessagesForMediaBudget(
+      [{ role: "user", content: [visionImageBlock("shot", 1920, 1080)] }],
+      { maxVisionTokens: TOKENS_1080P },
+    );
+
+    expect(result.totalVisionTokens).toBe(TOKENS_1080P);
+    expect(result.projectedVisionTokens).toBe(TOKENS_1080P);
+    expect(result.omittedMediaCount).toBe(0);
+  });
+
+  it("drops the oldest images when only the vision token budget is exceeded", () => {
+    const result = projectMessagesForMediaBudget(
+      [
+        { role: "tool", toolCallId: "old", content: [visionImageBlock("old", 1920, 1080)] },
+        { role: "tool", toolCallId: "mid", content: [visionImageBlock("mid", 1920, 1080)] },
+        { role: "user", content: [visionImageBlock("current", 1920, 1080)] },
+      ],
+      { maxVisionTokens: TOKENS_1080P * 2, latestRealUserMessageIndex: 2 },
+    );
+
+    expect(result.omittedMediaCount).toBe(1);
+    expect(result.projectedVisionTokens).toBe(TOKENS_1080P * 2);
+    expect(result.messages[0]!.content).toEqual([
+      expect.objectContaining({ type: "text", text: expect.stringContaining("Media omitted") }),
+    ]);
+    expect(result.messages[1]!.content).toEqual([
+      expect.objectContaining({ type: "image", source: expect.objectContaining({ placeholder: "mid" }) }),
+    ]);
+    expect(result.messages[2]!.content).toEqual([
+      expect.objectContaining({
+        type: "image",
+        source: expect.objectContaining({ placeholder: "current" }),
+      }),
+    ]);
+  });
+
+  it("still applies the byte budget when the vision token budget allows everything", () => {
+    const video = {
+      type: "video" as const,
+      mediaType: "video/mp4",
+      dataUrl: `data:video/mp4;base64,${"v".repeat(64)}`,
+    };
+    const result = projectMessagesForMediaBudget(
+      [
+        { role: "tool", toolCallId: "shot", content: [visionImageBlock("old", 1920, 1080)] },
+        { role: "user", content: [video] },
+      ],
+      {
+        maxMediaBytes: Buffer.byteLength(video.dataUrl),
+        maxVisionTokens: Number.MAX_SAFE_INTEGER,
+        latestRealUserMessageIndex: 1,
+      },
+    );
+
+    // token 预算不参与 video，字节预算单独裁掉旧图。
+    expect(result.totalVisionTokens).toBe(TOKENS_1080P);
+    expect(result.omittedMediaCount).toBe(1);
+    expect(result.projectedVisionTokens).toBe(0);
+  });
+
+  it("bounds a long screenshot history to the published vision token budget", () => {
+    // 验收口径：ninfer 默认 262144 max_vision_tokens 恰好容纳 128 张 2040-token
+    // 截图（128×2040=261120）；第 129 张及更早的历史必须换占位文本。
+    const history = Array.from({ length: 129 }, (_, index) => ({
+      role: "tool" as const,
+      toolCallId: `shot-${index}`,
+      content: [visionImageBlock(`shot-${index}`, 1920, 1080)],
+    }));
+    const messages: ModelInputMessage[] = [
+      ...history,
+      { role: "user", content: [visionImageBlock("current", 1920, 1080)] },
+    ];
+
+    const result = projectMessagesForMediaBudget(messages, { maxVisionTokens: 262_144 });
+
+    expect(result.projectedVisionTokens).toBeLessThanOrEqual(262_144);
+    expect(result.retainedMediaCount).toBe(128);
+    expect(result.omittedMediaCount).toBe(2);
+    expect(result.messages[0]!.content).toEqual([
+      expect.objectContaining({ type: "text", text: expect.stringContaining("Media omitted") }),
+    ]);
+    expect(result.messages[1]!.content).toEqual([
+      expect.objectContaining({ type: "text", text: expect.stringContaining("Media omitted") }),
+    ]);
+    expect(result.messages.at(-1)!.content).toEqual([
+      expect.objectContaining({
+        type: "image",
+        source: expect.objectContaining({ placeholder: "current" }),
+      }),
+    ]);
+  });
+
+  it("throws the shared error code when current media exceeds the vision budget", () => {
+    expect(() =>
+      projectMessagesForMediaBudget(
+        [
+          {
+            role: "user",
+            content: [
+              visionImageBlock("a", 1920, 1080),
+              visionImageBlock("b", 1920, 1080),
+            ],
+          },
+        ],
+        { maxVisionTokens: TOKENS_1080P },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        code: "MEDIA_BUDGET_CURRENT_ATTACHMENT_TOO_LARGE",
+        type: CoreErrorType.InvalidInput,
+        context: expect.objectContaining({
+          maxVisionTokens: TOKENS_1080P,
+          protectedVisionTokens: TOKENS_1080P * 2,
+        }),
+      }),
+    );
+  });
+
+  it("counts undecodable image payloads as zero vision tokens", () => {
+    const result = projectMessagesForMediaBudget(
+      [{ role: "user", content: [imageBlock("fake", 64)] }],
+      { maxVisionTokens: 1 },
+    );
+
+    expect(result.totalVisionTokens).toBe(0);
+    expect(result.omittedMediaCount).toBe(0);
+  });
+
+  it("rejects a non-finite or negative vision token budget", () => {
+    for (const maxVisionTokens of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => projectMessagesForMediaBudget([], { maxVisionTokens })).toThrow(
+        expect.objectContaining({ type: CoreErrorType.ConfigurationError }),
+      );
+    }
+  });
+});
+
+function visionImageBlock(placeholder: string, width: number, height: number) {
+  return {
+    type: "image" as const,
+    mediaType: "image/png",
+    dataUrl: pngDataUrl(width, height),
+    source: {
+      id: placeholder,
+      kind: "inline" as const,
+      mimeType: "image/png",
+      placeholder,
+    },
+  };
+}
+
+// 最小合法 PNG 头：8B 签名 + IHDR 块（尺寸字段即预算所需的全部输入）。
+function pngDataUrl(width: number, height: number): string {
+  const header = Buffer.alloc(24);
+  header.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  header.writeUInt32BE(13, 8);
+  header.write("IHDR", 12, "ascii");
+  header.writeUInt32BE(width, 16);
+  header.writeUInt32BE(height, 20);
+  return `data:image/png;base64,${header.toString("base64")}`;
+}

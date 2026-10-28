@@ -60,6 +60,7 @@ export async function runModelTextRequest(
   });
   const mediaProjection = projectMessagesForMediaBudget(capabilityProjection.messages, {
     latestRealUserMessageIndex: options.latestRealUserMessageIndex,
+    maxVisionTokens: model.properties.maxVisionTokens,
   });
   logMediaBudgetProjection(this.logger, options.traceContext, mediaProjection, {
     event: "model.request.media_projection",

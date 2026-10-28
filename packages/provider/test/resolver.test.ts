@@ -12,6 +12,7 @@ import {
   ProviderTemplateMap,
   createRegistryModelConfig,
   createRegistryProviderConfig,
+  serializeRegistryModelConfig,
   parsePersonalProviderConfigMap,
   parseProviderConfigMap,
   ZhipuAccountAccessConfig,
@@ -803,5 +804,27 @@ describe("ProviderConfigResolver", () => {
         "providers.valid.models.missing-config.properties",
       ]),
     );
+  });
+});
+
+describe("serializeRegistryModelConfig maxVisionTokens", () => {
+  it("可选叶子在 Overlay 与序列化中保留；未设置时不序列化", () => {
+    const configured = createRegistryModelConfig(
+      completeModelConfig({ maxVisionTokens: 262_144 }),
+    );
+    if (!configured.ok) throw new Error("complete model config should validate");
+    expect(serializeRegistryModelConfig(configured.config).properties.maxVisionTokens).toBe(
+      262_144,
+    );
+
+    const unset = createRegistryModelConfig(completeModelConfig());
+    if (!unset.ok) throw new Error("complete model config should validate");
+    expect("maxVisionTokens" in serializeRegistryModelConfig(unset.config).properties).toBe(false);
+
+    const overlaid = configured.config.overlay(
+      new ModelConfig({ properties: new ModelPropertiesConfig({ contextWindow: 300_000 }) }),
+    );
+    expect(overlaid.properties?.maxVisionTokens).toBe(262_144);
+    expect(overlaid.properties?.toJSON().maxVisionTokens).toBe(262_144);
   });
 });

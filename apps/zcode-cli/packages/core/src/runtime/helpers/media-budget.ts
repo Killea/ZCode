@@ -3,6 +3,7 @@ import {
   MEDIA_BUDGET_CURRENT_ATTACHMENT_TOO_LARGE_ERROR_CODE,
   createCoreError,
   modelMessageContentToText,
+  readImageDataUrlSize,
   traceContextToLogContext,
 } from "../deps.js";
 import type {
@@ -30,6 +31,7 @@ export const DEFAULT_MODEL_REQUEST_MEDIA_BUDGET_BYTES = 40 * 1024 * 1024;
 interface MediaBlockRef {
   blockIndex: number;
   requestBytes: number;
+  visionTokens: number;
   messageIndex: number;
   protected: boolean;
 }
@@ -38,8 +40,10 @@ export interface MediaBudgetProjection {
   messages: ModelInputMessage[];
   omittedMediaCount: number;
   projectedMediaBytes: number;
+  projectedVisionTokens: number;
   retainedMediaCount: number;
   totalMediaBytes: number;
+  totalVisionTokens: number;
 }
 
 export interface ModelMediaPolicyProjection {
@@ -51,13 +55,14 @@ export interface ModelMediaPolicyProjection {
 export function projectMessagesForModelMediaPolicy(
   messages: ModelInputMessage[],
   inputFormat: ModelInputFormat,
-  options: { latestRealUserMessageIndex?: number } = {},
+  options: { latestRealUserMessageIndex?: number; maxVisionTokens?: number } = {},
 ): ModelMediaPolicyProjection {
   // 直接调用 Model 的辅助链路曾只补 capability、漏掉聚合预算；两阶段必须
   // 在同一个请求策略边界串联，避免新增消费者继续手工拼装而遗漏其中一半。
   const capabilityProjection = projectMessagesForInputFormat(messages, inputFormat);
   const mediaBudgetProjection = projectMessagesForMediaBudget(capabilityProjection.messages, {
     latestRealUserMessageIndex: options.latestRealUserMessageIndex,
+    maxVisionTokens: options.maxVisionTokens,
   });
   return {
     capabilityProjection,
@@ -69,6 +74,11 @@ export function projectMessagesForModelMediaPolicy(
 interface MediaBudgetProjectionOptions {
   latestRealUserMessageIndex?: number;
   maxMediaBytes?: number;
+  /**
+   * provider 公布的单请求视觉 token 上限（如 ninfer `max_vision_tokens`）。
+   * 配置后图片按像素尺寸折算 token 计入第二预算；缺省只执行字节预算。
+   */
+  maxVisionTokens?: number;
   preserveLatestUserMedia?: boolean;
 }
 
@@ -83,32 +93,61 @@ export function projectMessagesForMediaBudget(
       recoverable: true,
     });
   }
+  const maxVisionTokens = options.maxVisionTokens;
+  if (maxVisionTokens !== undefined && (!Number.isFinite(maxVisionTokens) || maxVisionTokens < 0)) {
+    throw createCoreError(
+      CoreErrorType.ConfigurationError,
+      "Invalid model request media vision token budget",
+      { context: { maxVisionTokens }, recoverable: true },
+    );
+  }
   const latestUserIndex =
     options.preserveLatestUserMedia === false
       ? -1
       : resolveLatestRealUserMessageIndex(messages, options.latestRealUserMessageIndex);
-  const mediaBlocks = collectMediaBlocks(messages, latestUserIndex);
+  const mediaBlocks = collectMediaBlocks(
+    messages,
+    latestUserIndex,
+    maxVisionTokens !== undefined,
+  );
   const totalMediaBytes = sumMediaBytes(mediaBlocks);
+  const totalVisionTokens = sumMediaVisionTokens(mediaBlocks);
 
-  if (totalMediaBytes <= maxMediaBytes) {
+  const overByteBudget = totalMediaBytes > maxMediaBytes;
+  const overVisionBudget = maxVisionTokens !== undefined && totalVisionTokens > maxVisionTokens;
+  if (!overByteBudget && !overVisionBudget) {
     return {
       messages,
       omittedMediaCount: 0,
       projectedMediaBytes: totalMediaBytes,
+      projectedVisionTokens: totalVisionTokens,
       retainedMediaCount: mediaBlocks.length,
       totalMediaBytes,
+      totalVisionTokens,
     };
   }
 
   const protectedMedia = mediaBlocks.filter((block) => block.protected);
   const protectedMediaBytes = sumMediaBytes(protectedMedia);
-  if (protectedMediaBytes > maxMediaBytes) {
+  const protectedVisionTokens = sumMediaVisionTokens(protectedMedia);
+  if (
+    protectedMediaBytes > maxMediaBytes ||
+    (maxVisionTokens !== undefined && protectedVisionTokens > maxVisionTokens)
+  ) {
     const errorCode = MEDIA_BUDGET_CURRENT_ATTACHMENT_TOO_LARGE_ERROR_CODE;
     const error = createCoreError(
       CoreErrorType.InvalidInput,
       "Current attachments are too large to send. Remove or compress attachments and try again.",
       {
-        context: { code: errorCode, maxMediaBytes, protectedMediaBytes, totalMediaBytes },
+        context: {
+          code: errorCode,
+          maxMediaBytes,
+          maxVisionTokens,
+          protectedMediaBytes,
+          protectedVisionTokens,
+          totalMediaBytes,
+          totalVisionTokens,
+        },
         recoverable: true,
       },
     );
@@ -120,15 +159,20 @@ export function projectMessagesForMediaBudget(
 
   const retainedKeys = new Set(protectedMedia.map(mediaKey));
   let remainingBytes = maxMediaBytes - protectedMediaBytes;
+  let remainingVisionTokens =
+    maxVisionTokens === undefined
+      ? Number.POSITIVE_INFINITY
+      : maxVisionTokens - protectedVisionTokens;
   const historicalMedia = mediaBlocks
     .filter((block) => !block.protected)
     .sort(
       (left, right) => right.messageIndex - left.messageIndex || right.blockIndex - left.blockIndex,
     );
   for (const media of historicalMedia) {
-    if (media.requestBytes > remainingBytes) continue;
+    if (media.requestBytes > remainingBytes || media.visionTokens > remainingVisionTokens) continue;
     retainedKeys.add(mediaKey(media));
     remainingBytes -= media.requestBytes;
+    remainingVisionTokens -= media.visionTokens;
   }
 
   const messagesWithBudget = messages.map((message, messageIndex) => ({
@@ -138,15 +182,16 @@ export function projectMessagesForMediaBudget(
     cacheControl: message.cacheControl ? { ...message.cacheControl } : undefined,
   }));
   const retainedMediaCount = retainedKeys.size;
+  const retainedMedia = mediaBlocks.filter((block) => retainedKeys.has(mediaKey(block)));
 
   return {
     messages: messagesWithBudget,
     omittedMediaCount: mediaBlocks.length - retainedMediaCount,
-    projectedMediaBytes: mediaBlocks
-      .filter((block) => retainedKeys.has(mediaKey(block)))
-      .reduce((total, block) => total + block.requestBytes, 0),
+    projectedMediaBytes: retainedMedia.reduce((total, block) => total + block.requestBytes, 0),
+    projectedVisionTokens: retainedMedia.reduce((total, block) => total + block.visionTokens, 0),
     retainedMediaCount,
     totalMediaBytes,
+    totalVisionTokens,
   };
 }
 
@@ -181,14 +226,17 @@ export function logMediaBudgetProjection(
     status: "completed",
     omittedMediaCount: projection.omittedMediaCount,
     projectedMediaBytes: projection.projectedMediaBytes,
+    projectedVisionTokens: projection.projectedVisionTokens,
     retainedMediaCount: projection.retainedMediaCount,
     totalMediaBytes: projection.totalMediaBytes,
+    totalVisionTokens: projection.totalVisionTokens,
   });
 }
 
 function collectMediaBlocks(
   messages: ModelInputMessage[],
   latestUserIndex: number,
+  visionBudgetEnabled: boolean,
 ): MediaBlockRef[] {
   const mediaBlocks: MediaBlockRef[] = [];
   messages.forEach((message, messageIndex) => {
@@ -199,6 +247,8 @@ function collectMediaBlocks(
       mediaBlocks.push({
         blockIndex,
         requestBytes,
+        // 未配置 maxVisionTokens 时跳过头部解码，零成本路径保持原状。
+        visionTokens: visionBudgetEnabled ? mediaVisionTokens(block) : 0,
         messageIndex,
         protected: messageIndex === latestUserIndex,
       });
@@ -250,6 +300,20 @@ function mediaRequestBytes(block: ModelMessageContentBlock): number {
   return 0;
 }
 
+// ninfer 按 merged vision token 计媒体聚合：一个 merged token = 2×2 个 16px
+// patch = 32×32 像素，单图 token = ceil(w/32) × ceil(h/32)。视频帧 token
+// 与无法从 data URL 头部解析尺寸的图片无法本地估算，这些块只受字节预算约束；
+// 能解析的至少把真实成本计入，避免整串 1080p 截图绕过 provider 上限。
+const VISION_TOKEN_SPAN_PX = 32;
+
+function mediaVisionTokens(block: ModelMessageContentBlock): number {
+  if (block.type !== "image") return 0;
+  const size = readImageDataUrlSize(block.dataUrl);
+  return size === undefined
+    ? 0
+    : Math.ceil(size.width / VISION_TOKEN_SPAN_PX) * Math.ceil(size.height / VISION_TOKEN_SPAN_PX);
+}
+
 function mediaOmittedTextBlock(block: ModelMessageContentBlock): ModelMessageContentBlock {
   const placeholder = modelMessageContentToText([block]) || "[Attached media]";
   return {
@@ -273,6 +337,10 @@ function cloneContentBlock(block: ModelMessageContentBlock): ModelMessageContent
 
 function sumMediaBytes(mediaBlocks: MediaBlockRef[]): number {
   return mediaBlocks.reduce((total, block) => total + block.requestBytes, 0);
+}
+
+function sumMediaVisionTokens(mediaBlocks: MediaBlockRef[]): number {
+  return mediaBlocks.reduce((total, block) => total + block.visionTokens, 0);
 }
 
 function mediaKey(input: Pick<MediaBlockRef, "blockIndex" | "messageIndex">): string {
