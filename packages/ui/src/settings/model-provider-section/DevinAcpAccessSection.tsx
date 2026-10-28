@@ -19,6 +19,8 @@ type DevinAcpAccess = Extract<
 >;
 
 const DEVIN_MODES = ["accept-edits", "smart", "ask", "plan", "bypass"] as const;
+// Radix Select.Item 禁止空字符串 value；用哨兵值表示"未设置=Devin 默认"。
+const DEVIN_MODE_DEFAULT = "default";
 const CONTEXT_FORWARD_POLICIES = ["memory-only", "all-dynamic", "none"] as const;
 const DEFAULT_TIMEOUT_SECONDS = 7200;
 const SECONDS_TO_MS = 1000;
@@ -99,14 +101,21 @@ export function DevinAcpAccessSection({
           {intl.formatMessage({ id: "settings.modelProvider.devin.mode" })}
         </label>
         <Select
-          value={access.mode ?? ""}
-          onValueChange={(value) => commit({ mode: value || undefined })}
+          value={access.mode ?? DEVIN_MODE_DEFAULT}
+          onValueChange={(value) =>
+            commit({
+              mode:
+                value === DEVIN_MODE_DEFAULT
+                  ? undefined
+                  : (value as (typeof DEVIN_MODES)[number]),
+            })
+          }
         >
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="start">
-            <SelectItem value="">
+            <SelectItem value={DEVIN_MODE_DEFAULT}>
               {intl.formatMessage({ id: "settings.modelProvider.devin.modeDefault" })}
             </SelectItem>
             {DEVIN_MODES.map((mode) => (
