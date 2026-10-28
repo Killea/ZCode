@@ -6,7 +6,7 @@ import {
   type AiSdkModelExecutionConfig,
   type EnvRecord,
 } from "@zcode/adapters/model";
-import type { Logger, ModelStatusSink } from "@zcode/contracts";
+import type { Logger, McpServerConfig, ModelStatusSink } from "@zcode/contracts";
 
 interface CreateModelAdapterBaseOptions {
   env?: EnvRecord;
@@ -15,6 +15,8 @@ interface CreateModelAdapterBaseOptions {
   modelIoFullRetentionEnabled?: boolean;
   streamIdleTimeoutMs?: number;
   statusSink?: ModelStatusSink;
+  /** devin-acp Provider 在 session/new 时读取的 MCP 透传配置源。 */
+  listMcpServers?: () => Readonly<Record<string, McpServerConfig>>;
 }
 
 export type CreateModelAdapterOptions = CreateModelAdapterBaseOptions & {
@@ -37,5 +39,8 @@ export function createModelAdapter(options: CreateModelAdapterOptions): AiSdkMod
     modelIoFullRetentionEnabled: options.modelIoFullRetentionEnabled,
     streamIdleTimeoutMs: options.streamIdleTimeoutMs,
     statusSink: options.statusSink,
+    ...(options.listMcpServers
+      ? { devinAcp: { listMcpServers: options.listMcpServers } }
+      : {}),
   });
 }

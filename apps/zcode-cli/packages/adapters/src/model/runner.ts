@@ -45,6 +45,10 @@ import {
 } from "./runner-runtime.js";
 import { createModel, type ModelExecutionRequest } from "./model.js";
 import { refreshOffPeakRequestAuth } from "./off-peak-request-auth.js";
+import {
+  createDevinAcpModel,
+  type DevinAcpAdapterDeps,
+} from "./devin-acp/index.js";
 
 export type { AiSdkModelRetryOptions } from "./retry-policy.js";
 export type {
@@ -70,6 +74,8 @@ export interface AiSdkModelAdapterOptions {
   statusSink?: ModelStatusSink;
   streamIdleTimeoutMs?: number;
   modelIoFullRetentionEnabled?: boolean;
+  /** devin-acp Provider 的宿主侧依赖（MCP 透传、日志）。 */
+  devinAcp?: DevinAcpAdapterDeps;
 }
 
 export interface CreateAiSdkModelOptions {
@@ -92,6 +98,7 @@ export class AiSdkModelAdapter {
   private statusSink?: ModelStatusSink;
   private readonly streamIdleTimeoutMs: number;
   private modelIoFullRetentionEnabled: boolean;
+  private readonly devinAcpDeps?: DevinAcpAdapterDeps;
 
   constructor(options: AiSdkModelAdapterOptions) {
     this.execution = new AiSdkModelExecution(
@@ -118,6 +125,7 @@ export class AiSdkModelAdapter {
     this.statusSink = options.statusSink;
     this.streamIdleTimeoutMs = options.streamIdleTimeoutMs ?? DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS;
     this.modelIoFullRetentionEnabled = options.modelIoFullRetentionEnabled ?? false;
+    this.devinAcpDeps = options.devinAcp;
   }
 
   setModelIoFullRetentionEnabled(enabled: boolean): void {
@@ -147,6 +155,26 @@ export class AiSdkModelAdapter {
   }
 
   createModel(options: CreateAiSdkModelOptions): Model {
+    // devin-acp 是进程内 ACP executor，不是 HTTP provider：
+    // 在 bindModel 之前分流，绕开 baseUrl/API-key 归一化与 runner retry。
+    if (options.providerConfig.api.type === "devin-acp") {
+      return createDevinAcpModel(
+        {
+          providerId: options.providerId,
+          modelId: options.modelId,
+          providerConfig: options.providerConfig,
+          modelConfig: options.modelConfig,
+          ...(options.displayName === undefined ? {} : { displayName: options.displayName }),
+          ...(options.options === undefined ? {} : { options: options.options }),
+        },
+        {
+          ...(this.devinAcpDeps?.listMcpServers
+            ? { listMcpServers: this.devinAcpDeps.listMcpServers }
+            : {}),
+          ...(this.logger ? { logger: this.logger } : {}),
+        },
+      );
+    }
     const boundResolution = this.execution.bindModel({
       providerId: options.providerId,
       modelId: options.modelId,
