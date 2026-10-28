@@ -4,6 +4,7 @@ import { manualModelConfigSchema } from "./manual-model-config.js";
 export { manualModelConfigSchema, type ManualModelConfig } from "./manual-model-config.js";
 import {
   apiKeyAccessDataSchema,
+  devinAcpAccessDataSchema,
   personalProviderApiDataSchema,
   providerConfigDataSchema,
   providerGroupDataSchema,
@@ -97,7 +98,14 @@ export const providerTemplateConfigRuleSchema = providerTemplateDataSchema.exten
   config: providerConfigDataSchema
     .pick({ logo: true, access: true, api: true, builtinModelIds: true })
     .extend({
-      access: apiKeyAccessDataSchema.omit({ apiKey: true }).nullable().optional(),
+      // 模板不发放凭证：apiKey 叶子统一剥离，由 Personal Provider 承载用户输入。
+      access: z
+        .discriminatedUnion("type", [
+          apiKeyAccessDataSchema.omit({ apiKey: true }),
+          devinAcpAccessDataSchema.omit({ apiKey: true }),
+        ])
+        .nullable()
+        .optional(),
     }),
 });
 export const builtinProviderConfigRuleSchema = providerConfigRuleSchema.extend({

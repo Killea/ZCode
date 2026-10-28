@@ -2553,6 +2553,17 @@
       ],
       "modelApiRules": [
         {
+          "modelMatch": ".*",
+          "apiTypeMatch": "devin-acp",
+          "config": {
+            "optionSpecs": {
+              "maxOutputTokens": {
+                "map": "{}"
+              }
+            }
+          }
+        },
+        {
           "modelMatch": ".*claude-(?:opus-(?:4[.-]8|5)|(?:fable|mythos)-5(?:[.-]1)?)(?:[.\\-:/\\[].*)?",
           "apiTypeMatch": "anthropic-messages",
           "config": {
@@ -4488,6 +4499,13 @@
         }
       ],
       "templateModelRules": [
+        {
+          "templateId": "devin-acp",
+          "modelId": "swe-2-max",
+          "config": {
+            "enabled": true
+          }
+        },
         {
           "templateId": "opencode-go-chat",
           "modelId": "glm-5.3-flash",

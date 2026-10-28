@@ -11,6 +11,13 @@ describe("Zhipu four manual API templates", () => {
       );
       const templates = release.config.providerConfigRules.templateRules;
       for (const template of templates) {
+        // devin-acp 等非 API-Key 访问类型的模板没有 Key 管理入口。
+        if (
+          template.config.access?.type !== "api-key" &&
+          template.config.access?.type !== "zhipu-coding-plan-api-key"
+        ) {
+          continue;
+        }
         expect(
           new URL(template.config.access.apiKeyManagementUrl).protocol,
           template.templateId,

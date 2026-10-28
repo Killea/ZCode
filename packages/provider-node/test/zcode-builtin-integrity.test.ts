@@ -3,6 +3,7 @@ import { compileModelOptionMaps } from "@zcode/model-option-map";
 import { fileURLToPath } from "node:url";
 import {
   ApiKeyAccessConfig,
+  DevinAcpAccessConfig,
   ModelConfigRules,
   ProviderConfig,
   ProviderApiConfig,
@@ -564,6 +565,7 @@ describe("ZCode Built-in Provider Config 完整性", () => {
         "opencode-zen-responses",
         "opencode-zen-messages",
         "opencode-zen-chat",
+        "devin-acp",
       ]);
       for (const [templateId, template] of snapshot.providerTemplates?.entries() ?? []) {
         expect(
@@ -965,7 +967,9 @@ describe("ZCode Built-in Provider Config 完整性", () => {
           return model.enabled !== false;
         });
         expectedModelIds.set(providerId, enabledModelIds);
-        expect(["api-key", "zhipu-coding-plan-api-key"]).toContain(template.config.access?.type);
+        expect(["api-key", "zhipu-coding-plan-api-key", "devin-acp"]).toContain(
+          template.config.access?.type,
+        );
         if (template.config.access?.type !== "zhipu-account") {
           expect(template.config.access.apiKey, `${templateId} 不得保存 API Key`).toBeUndefined();
         }
@@ -974,10 +978,13 @@ describe("ZCode Built-in Provider Config 完整性", () => {
           templateId,
           config: new ProviderConfig({
             group: "standard-personal",
-            access: new ApiKeyAccessConfig({
-              type: template.config.access?.type,
-              apiKey: `test-key-for-${templateId}`,
-            }),
+            access:
+              template.config.access?.type === "devin-acp"
+                ? new DevinAcpAccessConfig({ apiKey: `test-key-for-${templateId}` })
+                : new ApiKeyAccessConfig({
+                    type: template.config.access?.type,
+                    apiKey: `test-key-for-${templateId}`,
+                  }),
           }),
         });
       }
@@ -1023,6 +1030,7 @@ describe("ZCode Built-in Provider Config 完整性", () => {
         "template:opencode-zen-responses",
         "template:opencode-zen-messages",
         "template:opencode-zen-chat",
+        "template:devin-acp",
       ]);
 
       for (const provider of resolution.registryProviders) {

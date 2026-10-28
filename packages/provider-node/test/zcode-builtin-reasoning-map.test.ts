@@ -257,6 +257,9 @@ describe("Todo138 Model 层兜底与专用档位", () => {
     expect(result.optionSpecs!.reasoningLevel!.values).toEqual(["disabled", "enabled"]);
     expect(result.optionSpecs!.reasoningLevel!.map).toBe("{}");
     for (const rule of rules.modelApiRules!.filter((rule) => rule.modelMatch === ".*")) {
+      // API 通用规则不得声明 reasoning 档位；未声明 reasoningLevel 的规则（如 devin-acp
+      // 只给 maxOutputTokens.map）直接跳过。
+      if (rule.config.optionSpecs?.reasoningLevel === undefined) continue;
       expect(rule.config.optionSpecs?.reasoningLevel).not.toHaveProperty("values");
     }
   });
