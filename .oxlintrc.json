@@ -56,6 +56,13 @@
   "globals": {},
   "ignorePatterns": [
     "dist-release",
+    // 构建产物目录与 .gitignore 对齐：oxlint 不读 .gitignore，
+    // 不忽略会把打包/编译输出扫进 max-lines 等规则检查。
+    "dist",
+    "out",
+    "packages/desktop/dist-*",
+    "packages/desktop/bundled-agents",
+    "packages/desktop/mock-cdn",
     "packages/ui/src/components/ui",
     "packages/ui/src/components/ai-elements",
     ".claude/skills",
