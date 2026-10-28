@@ -289,6 +289,7 @@ export function ModelRowInput({
           </Button>
         ) : null}
         <ProviderModelMetadataDialog
+          providerAccess={providerAccess}
           onRestore={() => {
             setDraftErrorField(null);
             setCommitErrorMessage(null);

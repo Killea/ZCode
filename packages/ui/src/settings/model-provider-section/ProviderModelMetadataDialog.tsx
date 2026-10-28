@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog.js";
 import { Input } from "@/components/ui/input.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
-import type { ModelConfigObject } from "@zcode/provider";
+import type { ModelConfigObject, ProviderConfigObject } from "@zcode/provider";
 import type {
   ProviderModelDraftValues,
   ProviderModelDraftCommitResult,
@@ -52,6 +52,7 @@ export function ProviderModelMetadataDialog({
   draft,
   draftErrorMessage,
   draftErrorField,
+  providerAccess,
   personalConfig,
   overrideFields,
   inheritedConfig,
@@ -70,6 +71,7 @@ export function ProviderModelMetadataDialog({
   draft: ProviderModelDraftValues;
   draftErrorMessage: string | null;
   draftErrorField?: Extract<ProviderModelDraftCommitResult, { status: "invalid" }>["field"] | null;
+  providerAccess?: ProviderConfigObject["access"];
   personalConfig?: ModelConfigObject;
   overrideFields?: ReadonlySet<string>;
   inheritedConfig?: ModelConfigObject;
@@ -129,6 +131,9 @@ export function ProviderModelMetadataDialog({
     compositionActiveRef.current = false;
   };
   const maxOutputTokensInputDisabled = mode === "add" && !draft.idValue.trim();
+  // devin-acp 由 Devin agent 自控上下文、输出与流式超时；这些 ZCode 侧字段对其无效，
+  // 隐藏避免误导（底层占位值仍保留以满足模型校验）。
+  const hideTokenFields = providerAccess?.type === "devin-acp";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {mode === "edit" ? (
@@ -204,12 +209,14 @@ export function ProviderModelMetadataDialog({
               </div>
             </div>
           </ModelSettingsGroup>
-          <ModelSettingsGroup group="tokens">
-            <div className="space-y-3">
-              <div>
-                <div className="mb-1 block text-ui-base text-foreground-subtle">
-                  <ModelConfigInputLabel field="contextWindow" htmlFor={contextWindowInputId} />
-                </div>
+          {hideTokenFields ? null : (
+            <>
+            <ModelSettingsGroup group="tokens">
+              <div className="space-y-3">
+                <div>
+                  <div className="mb-1 block text-ui-base text-foreground-subtle">
+                    <ModelConfigInputLabel field="contextWindow" htmlFor={contextWindowInputId} />
+                  </div>
                 <Input
                   {...TECHNICAL_INPUT_ATTRIBUTES}
                   id={contextWindowInputId}
@@ -321,6 +328,8 @@ export function ProviderModelMetadataDialog({
               onCommit={() => void commit()}
             />
           </ModelSettingsGroup>
+            </>
+          )}
           <ModelEditorAdvanced
             open={open}
             errorField={draftErrorField}

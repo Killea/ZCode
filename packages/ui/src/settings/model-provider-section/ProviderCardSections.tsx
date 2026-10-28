@@ -530,6 +530,7 @@ export function ProviderModelsSection({
       )}
       <>
         <ProviderModelMetadataDialog
+          providerAccess={providerAccess}
           onRestore={() => {
             setAddDraftErrorField(null);
             setAddCommitError(null);
