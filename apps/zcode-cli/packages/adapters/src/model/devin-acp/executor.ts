@@ -48,11 +48,15 @@ export class DevinModelExecutor implements ModelExecutor {
   async generateText(request: ModelExecutionRequest): Promise<ModelResult> {
     let text = "";
     let finishReason = "stop";
+    let usage: ModelResult["usage"] = {};
     for await (const event of this.streamText(request)) {
       if (event.type === "text_delta") text += event.text;
-      if (event.type === "finish") finishReason = event.finishReason;
+      if (event.type === "finish") {
+        finishReason = event.finishReason;
+        usage = event.usage;
+      }
     }
-    return { text, finishReason, usage: {} };
+    return { text, finishReason, usage };
   }
 
   async *streamText(request: ModelExecutionRequest): AsyncGenerator<ModelEvent> {
@@ -69,6 +73,9 @@ export class DevinModelExecutor implements ModelExecutor {
     const updates = new UpdateQueue();
     let textStarted = false;
     let reasoningStarted = false;
+    // Devin usage_update 可能在一轮 prompt 内多次到达（流式中途 + 结束时），
+    // finish.usage 只带最后一份快照；meter 语义是"当前占用"而不是累计值。
+    let latestUsage: Extract<DevinAcpUpdate, { kind: "usage" }> | undefined;
     const closeReasoning = function* (): Generator<ModelEvent> {
       if (reasoningStarted) {
         reasoningStarted = false;
@@ -96,6 +103,11 @@ export class DevinModelExecutor implements ModelExecutor {
           break;
         }
         const update = next.value;
+        // usage 快照不产生文本/推理块，只暂存供 finish.usage 使用。
+        if (update.kind === "usage") {
+          latestUsage = update;
+          continue;
+        }
         if (update.kind === "thought") {
           if (!reasoningStarted) {
             reasoningStarted = true;
@@ -123,8 +135,13 @@ export class DevinModelExecutor implements ModelExecutor {
       yield {
         type: "finish",
         finishReason: mapStopReason(stopReason),
-        usage: {},
-        providerMetadata: { devinStopReason: stopReason },
+        usage: latestUsage
+          ? { contextTokens: latestUsage.used, contextWindow: latestUsage.size }
+          : {},
+        providerMetadata: {
+          devinStopReason: stopReason,
+          ...(latestUsage?.cost ? { devinCost: latestUsage.cost } : {}),
+        },
       };
     } catch (error) {
       yield* closeReasoning();

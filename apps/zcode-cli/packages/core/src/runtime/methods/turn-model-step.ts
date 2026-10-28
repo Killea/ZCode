@@ -646,8 +646,11 @@ async function runModelBackedTurnStepImpl(
       // 桌面 continuous 实时事件只携带当前 model_complete payload。
       // 如果主轮次只发 usage 不发 contextWindow，旧 task stream 无法生成 usage_update，
       // 长程任务中输入栏会拿不到 context meter 的 size 而隐藏。
-      ...(querySource === "main_turn" && executionContextWindow !== undefined
-        ? { contextWindow: executionContextWindow }
+      // devin-acp y otros agent-executor reportan su ventana real en usage.contextWindow:
+      // es el valor autoritativo; solo si no llega se usa la declaración estática del modelo.
+      ...(querySource === "main_turn" &&
+      (result.usage.contextWindow ?? executionContextWindow) !== undefined
+        ? { contextWindow: result.usage.contextWindow ?? executionContextWindow }
         : {}),
       querySource,
       stopReason: result.finishReason,

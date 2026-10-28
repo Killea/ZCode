@@ -13,6 +13,8 @@ import {
   flattenTranscriptForNewSession,
 } from "../src/model/devin-acp/context-filter.js";
 import { AcpTransport } from "../src/model/devin-acp/transport.js";
+import { DevinAcpBridge } from "../src/model/devin-acp/bridge.js";
+import { DevinModelExecutor } from "../src/model/devin-acp/executor.js";
 
 const system = (text: string): ModelInputMessage => ({ role: "system", content: text });
 const user = (text: string): ModelInputMessage => ({ role: "user", content: text });
@@ -157,5 +159,59 @@ describe("AcpTransport", () => {
     const pending = transport.request("session/prompt", {});
     proc.emit("exit", 1);
     await expect(pending).rejects.toThrow(/exited/);
+  });
+});
+
+describe("DevinModelExecutor context usage", () => {
+  const request = (text: string) =>
+    ({
+      messages: [user(text)],
+      options: {},
+    }) as unknown as Parameters<DevinModelExecutor["streamText"]>[0];
+
+  it("usage_update llega a finish.usage como contextTokens/contextWindow", async () => {
+    vi.spyOn(DevinAcpBridge.prototype, "ensureSession").mockResolvedValue({
+      acpSessionId: "s1",
+      isNew: false,
+    });
+    vi.spyOn(DevinAcpBridge.prototype, "runPrompt").mockImplementation(
+      async (input: { onUpdate: (u: unknown) => void }) => {
+        input.onUpdate({ kind: "usage", used: 186_000, size: 262_144 });
+        input.onUpdate({ kind: "text", text: "hecho" });
+        input.onUpdate({ kind: "usage", used: 190_000, size: 262_144 });
+        return { stopReason: "end_turn" };
+      },
+    );
+
+    const executor = new DevinModelExecutor({ promptTimeoutMs: 1000, cwd: "/tmp" });
+    const events = [];
+    for await (const event of executor.streamText(request("hola"))) {
+      events.push(event);
+    }
+    const finish = events.find((e) => e.type === "finish");
+    expect(finish?.usage).toEqual({ contextTokens: 190_000, contextWindow: 262_144 });
+    // La última usage_update gana: es "ocupación actual", no acumulable.
+    const texts = events.filter((e) => e.type === "text_delta").map((e) => e.text);
+    expect(texts).toContain("hecho");
+  });
+
+  it("sin usage_update finish.usage queda vacío (meter oculto, nada fabricado)", async () => {
+    vi.spyOn(DevinAcpBridge.prototype, "ensureSession").mockResolvedValue({
+      acpSessionId: "s1",
+      isNew: false,
+    });
+    vi.spyOn(DevinAcpBridge.prototype, "runPrompt").mockImplementation(
+      async (input: { onUpdate: (u: unknown) => void }) => {
+        input.onUpdate({ kind: "text", text: "ok" });
+        return { stopReason: "end_turn" };
+      },
+    );
+    const executor = new DevinModelExecutor({ promptTimeoutMs: 1000, cwd: "/tmp" });
+    const events = [];
+    for await (const event of executor.streamText(request("hola"))) {
+      events.push(event);
+    }
+    const finish = events.find((e) => e.type === "finish");
+    expect(finish?.usage).toEqual({});
   });
 });

@@ -6041,6 +6041,11 @@ function optionalContextUsageBreakdownFromPayload(
 }
 
 function contextUsageTokensFromPayload(usage: Record<string, unknown>): number | undefined {
+  // Agent-executors (devin-acp) reportan ocupación de contexto, no tokens por petición:
+  // usage.contextTokens es el valor autoritativo del agente (usage_update.used de ACP).
+  const reportedContextTokens = positiveIntegerValue(usage.contextTokens);
+  if (reportedContextTokens !== undefined) return reportedContextTokens;
+
   const inputTokens = positiveIntegerValue(usage.inputTokens ?? usage.input);
   if (inputTokens !== undefined) {
     // AI SDK v6 已把 Anthropic cache read/write 并入 inputTokens。

@@ -185,7 +185,9 @@ session/update 通知 → ModelStreamEvent
   ├─ agent_thought_chunk   → reasoning_delta
   ├─ tool_call/plan/…      → 渲染为文本标记（如 `\n[devin: bash $ ls]\n`）
   │                        ⚠ 绝不映射为 tool_call 事件（否则 zcode 尝试执行）
-  ├─ usage_update          → 累计进 finish.usage（缺失则 0）
+  ├─ usage_update          → finish.usage{contextTokens=used, contextWindow=size}
+  │                        （ última del turno; NO entra en token ledger — ver
+  │                        「Context meter」）
   └─ elicitation/request   → 自动回 `{action:"cancel"}`（兜底；正常不会到达）
 
 session/prompt resolve → {type:"finish", finishReason, usage}
@@ -199,6 +201,26 @@ prompt 发送：逐条 role 打标、assistant/user 文本截断到上限、tool
 一行执行摘要。这覆盖"中途切模型/恢复后 load 失败/compact 后"三类边角；
 正常续聊每轮只发最新 user 消息。`embeddedContext` 为 resource part 的
 协议用途。
+
+### Context meter（用量感知）
+
+Devin reporta su contexto real por `session/update{sessionUpdate:"usage_update",
+used, size, cost?}` — el mismo dato que muestra `devin` en su propia UI
+(`71% (186K / 262K)`). Diseño de la integración:
+
+- `ModelUsage` gana `contextTokens?`/`contextWindow?`: son **ocupación de contexto
+  gestionada por el agente** (acumulativa del ACP session), NO tokens de la
+  petición. Nunca se escriben en `inputTokens`/`totalTokens` para no contaminar
+  el ledger de tokens ni las estadísticas de consumo.
+- `getModelUsageContextTokens` prefiere `usage.contextTokens` cuando existe;
+  `model_complete.contextWindow` usa `usage.contextWindow ?? model.properties.
+  contextWindow` (el valor reportado por ACP es autoritativo sobre el estático).
+- El `cost` ({amount,currency}) viaja en `finish.providerMetadata.devinCost`
+  solo a efectos de diagnóstico: es "valor reportado por CLI", sin verificación.
+- Si Devin no envía `usage_update`, `finish.usage` queda `{}` y el meter sigue
+  oculto — nunca se sintetiza un valor.
+- `usage_update` es extensión **unstable** de ACP (sin capability de cliente);
+  se consume si llega, se ignora si no.
 
 ### 上下文与记忆注入
 

@@ -92,6 +92,28 @@ describe("model usage contracts", () => {
     expect(getModelUsageContextTokens({ totalTokens: 10, cacheReadTokens: 4 })).toBe(10);
   });
 
+  it("prefers agent-reported contextTokens over computed input+output", () => {
+    // devin-acp reporta ocupación de contexto (usage_update.used); es autoritativo
+    // y nunca debe mezclarse con input/output de la petición.
+    expect(
+      getModelUsageContextTokens({
+        contextTokens: 186_000,
+        contextWindow: 262_144,
+      }),
+    ).toBe(186_000);
+    expect(
+      getModelUsageContextTokens({
+        contextTokens: 186_000,
+        inputTokens: 50,
+        outputTokens: 10,
+      }),
+    ).toBe(186_000);
+    // contextTokens=0 no es un valor utilizable: cae al cálculo clásico.
+    expect(
+      getModelUsageContextTokens({ contextTokens: 0, inputTokens: 10, outputTokens: 4 }),
+    ).toBe(14);
+  });
+
   it("uses normalized total input as input window tokens", () => {
     expect(
       getModelUsageInputWindowTokens({

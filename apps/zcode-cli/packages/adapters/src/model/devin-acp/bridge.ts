@@ -25,7 +25,14 @@ export type DevinAcpUpdate =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "thought"; readonly text: string }
   | { readonly kind: "tool"; readonly title: string; readonly status?: string }
-  | { readonly kind: "plan"; readonly text: string };
+  | { readonly kind: "plan"; readonly text: string }
+  | {
+      /** Devin 自管上下文窗口的实时占用（usage_update.used/size），非本轮 token 账本。 */
+      readonly kind: "usage";
+      readonly used: number;
+      readonly size: number;
+      readonly cost?: { readonly amount: number; readonly currency: string };
+    };
 
 export interface DevinAcpSessionHandle {
   readonly acpSessionId: string;
@@ -292,7 +299,33 @@ function normalizeSessionUpdate(update: unknown): DevinAcpUpdate | undefined {
   if (kind === "plan") {
     return { kind: "plan", text: formatPlan(record.entries) };
   }
+  if (kind === "usage_update") {
+    const used = nonNegativeFiniteNumber(record.used);
+    const size = nonNegativeFiniteNumber(record.size);
+    // used/size 缺任一都不是可展示的用量，整条丢弃（meter 保持隐藏而不是渲染假 0%）。
+    if (used === undefined || size === undefined || size <= 0) return undefined;
+    const cost = normalizeAcpCost(record.cost);
+    return { kind: "usage", used, size, ...(cost ? { cost } : {}) };
+  }
   return undefined;
+}
+
+function nonNegativeFiniteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : undefined;
+}
+
+function normalizeAcpCost(
+  value: unknown,
+): { amount: number; currency: string } | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const record = value as { amount?: unknown; currency?: unknown };
+  if (typeof record.amount !== "number" || !Number.isFinite(record.amount)) {
+    return undefined;
+  }
+  if (typeof record.currency !== "string" || !record.currency) return undefined;
+  return { amount: record.amount, currency: record.currency };
 }
 
 function contentText(content: unknown): string | undefined {

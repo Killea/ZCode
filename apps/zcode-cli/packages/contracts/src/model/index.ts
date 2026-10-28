@@ -523,6 +523,17 @@ export interface ModelUsage {
   cacheWriteTokens?: number;
   reasoningTokens?: number;
   serverToolUse?: ModelServerToolUsage;
+  /**
+   * Agent 自管上下文的当前占用 token 数（如 devin-acp `usage_update.used`）。
+   * 这是 agent 侧上下文窗口的累计占用，不是本轮请求的 input token；
+   * 只用于 context meter，不计入 token 账本聚合。
+   */
+  contextTokens?: number;
+  /**
+   * Agent 报告的实际上下文窗口大小（如 devin-acp `usage_update.size`）。
+   * 在场时优先于静态 `model.properties.contextWindow`。
+   */
+  contextWindow?: number;
 }
 
 export interface ModelUsageSummary {
@@ -547,6 +558,10 @@ export function getModelUsageTotalTokens(usage?: ModelUsage): number {
 
 export function getModelUsageContextTokens(usage?: ModelUsage): number | undefined {
   if (!usage) return undefined;
+
+  // Agent 自管上下文（devin-acp）上报的占用是权威值；不走 input+output 推算。
+  const reportedContextTokens = positiveInteger(usage.contextTokens);
+  if (reportedContextTokens !== undefined) return reportedContextTokens;
 
   const inputTokens = getModelUsageInputWindowTokens(usage);
   const outputTokens = nonNegativeInteger(usage.outputTokens) ?? 0;
