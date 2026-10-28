@@ -5,6 +5,8 @@ export const providerApiTypeDataSchema = z.enum([
   "anthropic-messages",
   "openai-chat-completions",
   "openai-responses",
+  // 本地 Devin CLI Agent（ACP 子进程），非 HTTP API；baseUrl 仅作哨兵值。
+  "devin-acp",
 ]);
 export const providerGroupDataSchema = z.enum([
   "standard-personal",
@@ -54,13 +56,35 @@ export const zhipuAccountAccessDataSchema = z
     type: completeZhipuAccountAccessDataSchema.shape.type,
   })
   .strict();
+export const devinAcpContextForwardDataSchema = z.enum([
+  "memory-only",
+  "all-dynamic",
+  "none",
+]);
+// Devin 本地 Agent 访问项：认证可走浏览器 PKCE（机器级缓存）或 meta.api_key；
+// 所有字段可缺省，binaryPath 缺省时由 adapter 侧 discovery 解析。
+export const devinAcpAccessDataSchema = z
+  .object({
+    type: z.literal("devin-acp"),
+    binaryPath: z.string().nullable().optional(),
+    apiKey: z.string().nullable().optional(),
+    // Devin session mode 值以 ACP 广告为准（accept-edits/smart/ask/plan/bypass 等），不写死枚举。
+    mode: z.string().min(1).nullable().optional(),
+    promptTimeoutMs: z.number().int().positive().nullable().optional(),
+    mcpPassthrough: z.boolean().nullable().optional(),
+    contextForward: devinAcpContextForwardDataSchema.nullable().optional(),
+  })
+  .strict();
+export const completeDevinAcpAccessDataSchema = devinAcpAccessDataSchema;
 export const providerAccessDataSchema = z.discriminatedUnion("type", [
   apiKeyAccessDataSchema,
   zhipuAccountAccessDataSchema,
+  devinAcpAccessDataSchema,
 ]);
 export const completeProviderAccessDataSchema = z.discriminatedUnion("type", [
   completeApiKeyAccessDataSchema,
   completeZhipuAccountAccessDataSchema,
+  completeDevinAcpAccessDataSchema,
 ]);
 
 export const completeProviderApiDataSchema = z

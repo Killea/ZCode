@@ -162,3 +162,48 @@ describe("Provider 数据校验与完整性使用同一合同", () => {
     expect(original.access?.toJSON()).toEqual(access.toJSON());
   });
 });
+
+describe("devin-acp Access", () => {
+  it("解析/覆盖/序列化 devin-acp access，并通过完整性校验", async () => {
+    const { DevinAcpAccessConfig } = await import("../src/index.js");
+    const config = parseProviderConfig({
+      group: "standard-personal",
+      access: {
+        type: "devin-acp",
+        binaryPath: "/home/u/.local/bin/devin",
+        mode: "smart",
+        promptTimeoutMs: 7200000,
+        mcpPassthrough: true,
+        contextForward: "memory-only",
+      },
+      api: { type: "devin-acp", baseUrl: "acp://devin" },
+      builtinModelIds: ["swe-2-max"],
+    });
+    expect(config.access?.type).toBe("devin-acp");
+    expect(createRegistryProviderConfig(config).ok).toBe(true);
+
+    const overlaid = config.overlay(
+      new ProviderConfig({
+        access: new DevinAcpAccessConfig({ mode: "bypass", apiKey: "k" }),
+      }),
+    );
+    expect(overlaid.access?.toJSON()).toMatchObject({
+      type: "devin-acp",
+      binaryPath: "/home/u/.local/bin/devin",
+      apiKey: "k",
+      mode: "bypass",
+      contextForward: "memory-only",
+    });
+  });
+
+  it("devin-acp access 拒绝未知字段（strict）", () => {
+    expect(() =>
+      parseProviderConfig({
+        group: "standard-personal",
+        access: { type: "devin-acp", unknownField: 1 },
+        api: { type: "devin-acp", baseUrl: "acp://devin" },
+        builtinModelIds: ["m"],
+      }),
+    ).toThrow();
+  });
+});

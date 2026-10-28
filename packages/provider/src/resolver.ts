@@ -3,12 +3,14 @@ import type { z } from "zod";
 import type { completeModelConfigDataSchema } from "@zcode/shared/model-config";
 import type {
   completeApiKeyAccessDataSchema,
+  completeDevinAcpAccessDataSchema,
   completeZhipuAccountAccessDataSchema,
   completeProviderConfigDataSchema,
 } from "./config/provider-data-schema.js";
 import type { ConfigValidationIssue } from "./config-overlay.js";
 import {
   type ApiKeyAccessConfig,
+  type DevinAcpAccessConfig,
   ModelConfig,
   ModelConfigRules,
   type ZhipuAccountAccessConfig,
@@ -25,9 +27,13 @@ import type { AccountProviderStates } from "./account-provider-state.js";
 export type RegistryZhipuAccountAccessConfig = ZhipuAccountAccessConfig &
   z.infer<typeof completeZhipuAccountAccessDataSchema>;
 
+export type RegistryDevinAcpAccessConfig = DevinAcpAccessConfig &
+  z.infer<typeof completeDevinAcpAccessDataSchema>;
+
 export type RegistryProviderAccessConfig =
   | (ApiKeyAccessConfig & z.infer<typeof completeApiKeyAccessDataSchema>)
-  | RegistryZhipuAccountAccessConfig;
+  | RegistryZhipuAccountAccessConfig
+  | RegistryDevinAcpAccessConfig;
 
 export type RegistryProviderConfig = ProviderConfig &
   z.infer<typeof completeProviderConfigDataSchema> & {
@@ -43,20 +49,40 @@ export function serializeRegistryProviderConfig(
     group: config.group,
     ...(config.logo === undefined ? {} : { logo: config.logo }),
     access:
-      config.access.type !== "zhipu-account"
+      config.access.type === "zhipu-account"
         ? {
-            type: config.access.type,
-            apiKey: config.access.apiKey,
-            ...(config.access.apiKeyManagementUrl === undefined
-              ? {}
-              : { apiKeyManagementUrl: config.access.apiKeyManagementUrl }),
-          }
-        : {
             type: config.access.type,
             accountType: config.access.accountType,
             mode: config.access.mode,
             entitled: config.access.entitled,
-          },
+          }
+        : config.access.type === "devin-acp"
+          ? {
+              type: config.access.type,
+              ...(config.access.binaryPath === undefined
+                ? {}
+                : { binaryPath: config.access.binaryPath }),
+              ...(config.access.apiKey === undefined
+                ? {}
+                : { apiKey: config.access.apiKey }),
+              ...(config.access.mode === undefined ? {} : { mode: config.access.mode }),
+              ...(config.access.promptTimeoutMs === undefined
+                ? {}
+                : { promptTimeoutMs: config.access.promptTimeoutMs }),
+              ...(config.access.mcpPassthrough === undefined
+                ? {}
+                : { mcpPassthrough: config.access.mcpPassthrough }),
+              ...(config.access.contextForward === undefined
+                ? {}
+                : { contextForward: config.access.contextForward }),
+            }
+          : {
+              type: config.access.type,
+              apiKey: config.access.apiKey,
+              ...(config.access.apiKeyManagementUrl === undefined
+                ? {}
+                : { apiKeyManagementUrl: config.access.apiKeyManagementUrl }),
+            },
     api: {
       type: config.api.type,
       baseUrl: config.api.baseUrl,
@@ -97,6 +123,9 @@ export function serializeRegistryModelConfig(
       ...(config.properties.streamIdleTimeoutMs === undefined
         ? {}
         : { streamIdleTimeoutMs: config.properties.streamIdleTimeoutMs }),
+      ...(config.properties.maxVisionTokens === undefined
+        ? {}
+        : { maxVisionTokens: config.properties.maxVisionTokens }),
     },
     optionSpecs: {
       reasoningLevel: config.optionSpecs.reasoningLevel,

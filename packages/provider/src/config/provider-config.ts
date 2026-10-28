@@ -3,6 +3,7 @@ import { ConfigOverlay, type ConfigValidationIssue } from "../config-overlay.js"
 import type { z } from "zod";
 import {
   completeApiKeyAccessDataSchema,
+  devinAcpAccessDataSchema,
   completeZhipuAccountAccessDataSchema,
   completeProviderApiDataSchema,
   completeProviderConfigDataSchema,
@@ -111,7 +112,64 @@ export class ZhipuAccountAccessConfig extends ConfigOverlay<ZhipuAccountAccessCo
   }
 }
 
-export type ProviderAccessConfig = ApiKeyAccessConfig | ZhipuAccountAccessConfig;
+export type DevinAcpAccessConfigInput = Omit<DevinAcpAccessConfigObject, "type">;
+
+export type DevinAcpAccessConfigObject = Readonly<z.infer<typeof devinAcpAccessDataSchema>>;
+
+export class DevinAcpAccessConfig extends ConfigOverlay<DevinAcpAccessConfig> {
+  readonly type = "devin-acp" as const;
+  readonly binaryPath?: DevinAcpAccessConfigInput["binaryPath"];
+  readonly apiKey?: DevinAcpAccessConfigInput["apiKey"];
+  readonly mode?: DevinAcpAccessConfigInput["mode"];
+  readonly promptTimeoutMs?: DevinAcpAccessConfigInput["promptTimeoutMs"];
+  readonly mcpPassthrough?: DevinAcpAccessConfigInput["mcpPassthrough"];
+  readonly contextForward?: DevinAcpAccessConfigInput["contextForward"];
+
+  constructor(input: DevinAcpAccessConfigInput = {}) {
+    super();
+    this.binaryPath = input.binaryPath;
+    this.apiKey = input.apiKey;
+    this.mode = input.mode;
+    this.promptTimeoutMs = input.promptTimeoutMs;
+    this.mcpPassthrough = input.mcpPassthrough;
+    this.contextForward = input.contextForward;
+    Object.freeze(this);
+  }
+
+  overlay(next: DevinAcpAccessConfig): DevinAcpAccessConfig {
+    return new DevinAcpAccessConfig({
+      binaryPath: this.overlayValue(this.binaryPath, next.binaryPath),
+      apiKey: this.overlayValue(this.apiKey, next.apiKey),
+      mode: this.overlayValue(this.mode, next.mode),
+      promptTimeoutMs: this.overlayValue(this.promptTimeoutMs, next.promptTimeoutMs),
+      mcpPassthrough: this.overlayValue(this.mcpPassthrough, next.mcpPassthrough),
+      contextForward: this.overlayValue(this.contextForward, next.contextForward),
+    });
+  }
+
+  validateComplete(path: readonly string[] = []): readonly ConfigValidationIssue[] {
+    return validateConfigSchema(devinAcpAccessDataSchema, this.toJSON(), path);
+  }
+
+  toJSON(): DevinAcpAccessConfigObject {
+    return {
+      type: this.type,
+      ...objectWithoutUndefined({
+        binaryPath: this.binaryPath,
+        apiKey: this.apiKey,
+        mode: this.mode,
+        promptTimeoutMs: this.promptTimeoutMs,
+        mcpPassthrough: this.mcpPassthrough,
+        contextForward: this.contextForward,
+      }),
+    };
+  }
+}
+
+export type ProviderAccessConfig =
+  | ApiKeyAccessConfig
+  | ZhipuAccountAccessConfig
+  | DevinAcpAccessConfig;
 
 export type ProviderAccessConfigObject = Readonly<z.infer<typeof providerAccessDataSchema>>;
 
@@ -505,6 +563,8 @@ function overlayProviderAccess(
       return current.overlay(next as ApiKeyAccessConfig);
     case "zhipu-account":
       return current.overlay(next as ZhipuAccountAccessConfig);
+    case "devin-acp":
+      return current.overlay(next as DevinAcpAccessConfig);
   }
 }
 

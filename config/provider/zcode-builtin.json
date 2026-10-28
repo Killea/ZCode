@@ -689,6 +689,29 @@
               "key": "opencode"
             }
           }
+        },
+        {
+          "templateId": "devin-acp",
+          "templateNameMap": {
+            "zh-CN": "Devin（本地 Agent）",
+            "en-US": "Devin (Local Agent)"
+          },
+          "config": {
+            "access": {
+              "type": "devin-acp"
+            },
+            "api": {
+              "type": "devin-acp",
+              "baseUrl": "acp://devin"
+            },
+            "builtinModelIds": [
+              "swe-2-max"
+            ],
+            "logo": {
+              "type": "builtin",
+              "key": "devin"
+            }
+          }
         }
       ],
       "providerRules": [
