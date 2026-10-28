@@ -81,7 +81,11 @@ export interface ElectronRendererContentSizeSnapshot {
  * 它只描述测试需要观察的字段，不是 Provider 配置事实源，也不参与运行时装配。
  */
 export interface E2EModelProviderSnapshot {
-  apiFormat: "anthropic-messages" | "openai-chat-completions" | "openai-responses";
+  apiFormat:
+    | "anthropic-messages"
+    | "openai-chat-completions"
+    | "openai-responses"
+    | "devin-acp";
   apiKey: string;
   apiKeyRequired?: boolean;
   createdAt: number;
@@ -820,6 +824,8 @@ function mapPersonalProviderKind(provider: ProviderConfig): E2EProviderKind {
   switch (provider.api?.type) {
     case "anthropic-messages":
       return "anthropic";
+    case "devin-acp":
+      return "openai-compatible";
     case "openai-responses":
       return "openai";
     case "openai-chat-completions":

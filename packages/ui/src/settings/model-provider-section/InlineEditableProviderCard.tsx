@@ -10,9 +10,11 @@ import type { ModelConnectivityResult } from "@zcode/shared";
 import {
   isApiKeyAccess,
   type ProviderApiType,
+  type ProviderConfigObject,
   type SavePersonalModelDraftInput,
 } from "@zcode/provider";
 import { logger } from "@/logger.js";
+import { DevinAcpAccessSection } from "./DevinAcpAccessSection.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { Switch } from "@/components/ui/switch.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
@@ -733,6 +735,22 @@ export function InlineEditableProviderCard({
   const headerProviderName = providerDisplayName;
   const isAccountProvider = provider.config.access?.type === "zhipu-account";
   const isApiKeyProvider = isApiKeyAccess(provider.config.access);
+  const isDevinProvider = provider.config.access?.type === "devin-acp";
+  const devinAccess =
+    provider.config.access?.type === "devin-acp" ? provider.config.access : undefined;
+
+  const handleDevinAccessSave = useCallback(
+    async (nextAccess: NonNullable<ProviderConfigObject["access"]>): Promise<void> => {
+      const nextProvider = {
+        ...provider,
+        config: { ...provider.config, access: nextAccess },
+        personalConfig: { ...provider.personalConfig, access: nextAccess },
+      };
+      if (JSON.stringify(nextProvider.config) === JSON.stringify(provider.config)) return;
+      await saveProviderWithCleanupGuard(nextProvider);
+    },
+    [provider, saveProviderWithCleanupGuard],
+  );
   const effectiveHeaderVisible = headerVisible && statusSection === undefined;
 
   return (
@@ -795,7 +813,7 @@ export function InlineEditableProviderCard({
           />
         ) : null}
 
-        {isAccountProvider ? null : (
+        {isAccountProvider || isDevinProvider ? null : (
           <ProviderConnectionSection
             provider={provider}
             readOnly={readOnlyEndpoints}
@@ -809,6 +827,10 @@ export function InlineEditableProviderCard({
             onBaseUrlCompositionEnd={handleTechnicalInputCompositionEnd}
           />
         )}
+
+        {devinAccess ? (
+          <DevinAcpAccessSection access={devinAccess} onSaveAccess={handleDevinAccessSave} />
+        ) : null}
 
         {isApiKeyProvider ? (
           <ProviderApiKeySection

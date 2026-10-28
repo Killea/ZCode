@@ -23,12 +23,15 @@ const PROVIDER_CONNECTION_API_FORMAT_PATHS: Record<ProviderApiType, string> = {
   "anthropic-messages": "/v1/messages",
   "openai-chat-completions": "/chat/completions",
   "openai-responses": "/responses",
+  // devin-acp 是本地 ACP 进程而非 HTTP endpoint，无 request path。
+  "devin-acp": "",
 };
 
 const PROVIDER_CONNECTION_API_FORMAT_TITLE_IDS: Record<ProviderApiType, string> = {
   "anthropic-messages": "settings.modelProvider.apiFormat.title.anthropicMessages",
   "openai-chat-completions": "settings.modelProvider.apiFormat.title.chatCompletions",
   "openai-responses": "settings.modelProvider.apiFormat.title.responses",
+  "devin-acp": "settings.modelProvider.devin.apiFormatTitle",
 };
 
 export function resolveProviderConnectionApiFormatOptions(): ProviderApiType[] {
