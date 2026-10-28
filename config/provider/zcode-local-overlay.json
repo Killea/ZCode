@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "config": {
+    "providerConfigRules": {
+      "templateRules": [
+        {
+          "templateId": "devin-acp",
+          "templateNameMap": {
+            "zh-CN": "Devin（本地 Agent）",
+            "en-US": "Devin (Local Agent)"
+          },
+          "config": {
+            "access": {
+              "type": "devin-acp"
+            },
+            "api": {
+              "type": "devin-acp",
+              "baseUrl": "acp://devin"
+            },
+            "builtinModelIds": [
+              "swe-2-max"
+            ],
+            "logo": {
+              "type": "builtin",
+              "key": "devin"
+            }
+          }
+        }
+      ],
+      "providerRules": []
+    },
+    "modelConfigRules": {
+      "modelRules": [],
+      "modelApiRules": [
+        {
+          "modelMatch": ".*",
+          "apiTypeMatch": "devin-acp",
+          "config": {
+            "optionSpecs": {
+              "maxOutputTokens": {
+                "map": "{}"
+              }
+            }
+          }
+        }
+      ],
+      "providerSiteRules": [],
+      "templateModelRules": [
+        {
+          "templateId": "devin-acp",
+          "modelId": "swe-2-max",
+          "config": {
+            "enabled": true
+          }
+        }
+      ],
+      "builtinProviderModelRules": []
+    }
+  }
+}

@@ -1,8 +1,17 @@
 import { watch, type FSWatcher } from "node:fs";
 import { createHash } from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
-import { basename, dirname, resolve } from "node:path";
-import type { ProviderConfigLayerSnapshot, ProviderSource } from "@zcode/provider";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
+import { z } from "zod";
+import {
+  ModelConfigRules,
+  parseZCodeBuiltinModelConfigRules,
+  parseZCodeBuiltinProviderConfigRules,
+  ProviderConfigMap,
+  ProviderTemplateMap,
+  type ProviderConfigLayerSnapshot,
+  type ProviderSource,
+} from "@zcode/provider";
 import { atomicWritePrivateTextFile, withFileLock } from "@zcode/shared/node";
 import {
   decodeZCodeBuiltinRelease,
@@ -11,9 +20,16 @@ import {
   type ZCodeBuiltinRelease,
 } from "./zcode-builtin-release.js";
 
+export const ZCODE_LOCAL_OVERLAY_FILE_NAME = "zcode-local-overlay.json" as const;
+
 export interface NodeZCodeBuiltinProviderConfigSourceOptions {
   readonly bundledFilePath: string;
   readonly activeFilePath?: string;
+  /**
+   * 本地 Overlay 是与远端 Release 竞争无关的本地追加层（fork 私有 Template/Rule）。
+   * 默认取 bundledFilePath 同目录的 zcode-local-overlay.json；传 null 禁用。
+   */
+  readonly localOverlayFilePath?: string | null;
   readonly watch?: boolean;
 }
 
@@ -31,6 +47,9 @@ export class NodeZCodeBuiltinProviderConfigSource implements ProviderSource<Prov
   #watchRefresh = Promise.resolve();
   #disposed = false;
 
+  readonly #localOverlayFilePath: string | null;
+  #localOverlay: Promise<ZCodeLocalOverlay | null> | null = null;
+
   constructor(options: NodeZCodeBuiltinProviderConfigSourceOptions) {
     const bundledFilePath = options.bundledFilePath.trim();
     if (!bundledFilePath) throw new Error("ZCode Built-in bundledFilePath 不能为空");
@@ -39,6 +58,11 @@ export class NodeZCodeBuiltinProviderConfigSource implements ProviderSource<Prov
     // 旧标识只有发布序号，不同 Endpoint 同序号会让 Registry 误复用上一来源。
     // Active 路径已含规范化 Endpoint 隔离范围；Worker 收到同一路径，不另拼账号事实。
     this.#sourceKey = createHash("sha256").update(resolve(this.#activeFilePath)).digest("hex");
+    this.#localOverlayFilePath =
+      options.localOverlayFilePath === null
+        ? null
+        : options.localOverlayFilePath?.trim() ||
+          join(dirname(bundledFilePath), ZCODE_LOCAL_OVERLAY_FILE_NAME);
     this.#watchEnabled = options.watch !== false;
   }
 
@@ -57,8 +81,9 @@ export class NodeZCodeBuiltinProviderConfigSource implements ProviderSource<Prov
       // Bundled 基线。缓存边界不可用时绕过 Active；Bundled 自身无效仍会在这里抛错。
       release = selectReleaseCandidate(await readReleaseCandidate(this.#bundledFilePath), null);
     }
-    this.#observedSignature ??= signatureOf(release);
-    return snapshotFromRelease(release, this.#sourceKey);
+    const overlay = await this.#loadLocalOverlay();
+    this.#observedSignature ??= observedSignatureOf(release, overlay);
+    return snapshotFromRelease(release, this.#sourceKey, overlay);
   }
 
   async applyRemoteRelease(release: ZCodeBuiltinRelease): Promise<ApplyZCodeBuiltinReleaseResult> {
@@ -108,6 +133,9 @@ export class NodeZCodeBuiltinProviderConfigSource implements ProviderSource<Prov
     if (this.#activeFilePath !== this.#bundledFilePath) {
       const activeSignature = active?.release ? signatureOf(active.release) : null;
       if (activeSignature !== signatureOf(selected)) await this.#writeActiveLocked(selected);
+      // Worker/Agent 只拿到 Active 路径；把 Overlay 随行物化到 Active 目录，
+      // 它们的同目录默认查找才能命中与 Host 一致的本地层。
+      await this.#syncLocalOverlayCacheLocked();
     }
     return selected;
   }
@@ -118,6 +146,30 @@ export class NodeZCodeBuiltinProviderConfigSource implements ProviderSource<Prov
       this.#activeFilePath,
       JSON.stringify(encodeZCodeBuiltinRelease(release), null, 2),
     );
+  }
+
+  async #syncLocalOverlayCacheLocked(): Promise<void> {
+    this.#assertNotDisposed();
+    const overlayPath = this.#localOverlayFilePath;
+    const target = join(dirname(this.#activeFilePath), ZCODE_LOCAL_OVERLAY_FILE_NAME);
+    if (!overlayPath || resolve(overlayPath) === resolve(target)) return;
+    const overlay = await this.#loadLocalOverlay();
+    if (!overlay) {
+      //  bundled Overlay 被移除时清掉 Active 侧的随行副本，不能留下过期本地层。
+      await rm(target, { force: true });
+      return;
+    }
+    const current = await readFile(target, "utf8").catch((error: unknown) => {
+      if (isFileNotFound(error)) return null;
+      throw error;
+    });
+    if (current !== overlay.raw) await writeFile(target, overlay.raw, "utf8");
+  }
+
+  #loadLocalOverlay(): Promise<ZCodeLocalOverlay | null> {
+    if (!this.#localOverlayFilePath) return Promise.resolve(null);
+    this.#localOverlay ??= readLocalOverlayFile(this.#localOverlayFilePath);
+    return this.#localOverlay;
   }
 
   async #ensureWatcher(): Promise<void> {
@@ -137,7 +189,8 @@ export class NodeZCodeBuiltinProviderConfigSource implements ProviderSource<Prov
         const release = await withFileLock(this.#activeFilePath, () =>
           this.#readAndMaterializeLocked(),
         );
-        const signature = signatureOf(release);
+        const overlay = await this.#loadLocalOverlay();
+        const signature = observedSignatureOf(release, overlay);
         if (this.#disposed || signature === this.#observedSignature) return;
         this.#observedSignature = signature;
         this.#emit("file-changed");
@@ -208,17 +261,84 @@ function selectReleaseCandidate(
 function snapshotFromRelease(
   release: ZCodeBuiltinRelease,
   sourceKey: string,
+  overlay: ZCodeLocalOverlay | null,
 ): ProviderConfigLayerSnapshot {
+  if (!overlay) {
+    return Object.freeze({
+      revision: `zcode-builtin:${release.revision}:${sourceKey}`,
+      providers: release.config.providers,
+      providerTemplates: release.config.providerTemplates,
+      models: release.config.modelConfigRules,
+    });
+  }
+  // Overlay 不参与 Bundled/Active/Remote 的 revision 竞争；只在快照层叠加，
+  // 远端目录升级后本地私有 Template/Rule 仍然生效。规则后置 = 同键冲突本地赢。
+  const revisionKey = createHash("sha256")
+    .update(sourceKey)
+    .update("\n")
+    .update(overlay.signature)
+    .digest("hex");
   return Object.freeze({
-    revision: `zcode-builtin:${release.revision}:${sourceKey}`,
-    providers: release.config.providers,
-    providerTemplates: release.config.providerTemplates,
-    models: release.config.modelConfigRules,
+    revision: `zcode-builtin:${release.revision}:${revisionKey}`,
+    providers: release.config.providers.overlay(overlay.providers),
+    providerTemplates: release.config.providerTemplates.overlay(overlay.providerTemplates),
+    models: new ModelConfigRules([
+      ...release.config.modelConfigRules.rules(),
+      ...overlay.models.rules(),
+    ]),
   });
 }
 
 function signatureOf(release: ZCodeBuiltinRelease): string {
   return `${release.revision}:${serializeZCodeBuiltinRelease(release)}`;
+}
+
+function observedSignatureOf(
+  release: ZCodeBuiltinRelease,
+  overlay: ZCodeLocalOverlay | null,
+): string {
+  return `${signatureOf(release)}|overlay:${overlay?.signature ?? "none"}`;
+}
+
+interface ZCodeLocalOverlay {
+  readonly raw: string;
+  readonly signature: string;
+  readonly providers: ProviderConfigMap;
+  readonly providerTemplates: ProviderTemplateMap;
+  readonly models: ModelConfigRules;
+}
+
+const localOverlaySchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    config: z
+      .object({
+        providerConfigRules: z.unknown(),
+        modelConfigRules: z.unknown(),
+      })
+      .strict(),
+  })
+  .strict();
+
+async function readLocalOverlayFile(filePath: string): Promise<ZCodeLocalOverlay | null> {
+  let raw: string;
+  try {
+    raw = await readFile(filePath, "utf8");
+  } catch (error) {
+    if (isFileNotFound(error)) return null;
+    throw error;
+  }
+  const parsed = localOverlaySchema.parse(JSON.parse(raw));
+  const { providers, providerTemplates } = parseZCodeBuiltinProviderConfigRules(
+    parsed.config.providerConfigRules,
+  );
+  return Object.freeze({
+    raw,
+    signature: createHash("sha256").update(raw).digest("hex"),
+    providers,
+    providerTemplates,
+    models: parseZCodeBuiltinModelConfigRules(parsed.config.modelConfigRules),
+  });
 }
 
 function isFileNotFound(error: unknown): boolean {

@@ -773,6 +773,11 @@ export default {
       to: "config/provider/zcode-builtin.json",
     },
     {
+      // 本地 Overlay 与远端 Release 并存；随包同行后 Host 快照层叠加，物化时同步到 Agent 的 Active 目录。
+      from: resolve(workspaceRoot, "config/provider/zcode-local-overlay.json"),
+      to: "config/provider/zcode-local-overlay.json",
+    },
+    {
       // 应用图标：打包后放入 resources 目录，主进程通过 process.resourcesPath 加载
       from: "build/icon.png",
       to: "icon.png",

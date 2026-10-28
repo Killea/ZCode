@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 100,
+  "revision": 31,
   "config": {
     "providerConfigRules": {
       "templateRules": [
@@ -687,29 +687,6 @@
             "logo": {
               "type": "builtin",
               "key": "opencode"
-            }
-          }
-        },
-        {
-          "templateId": "devin-acp",
-          "templateNameMap": {
-            "zh-CN": "Devin（本地 Agent）",
-            "en-US": "Devin (Local Agent)"
-          },
-          "config": {
-            "access": {
-              "type": "devin-acp"
-            },
-            "api": {
-              "type": "devin-acp",
-              "baseUrl": "acp://devin"
-            },
-            "builtinModelIds": [
-              "swe-2-max"
-            ],
-            "logo": {
-              "type": "builtin",
-              "key": "devin"
             }
           }
         }
@@ -2552,17 +2529,6 @@
         }
       ],
       "modelApiRules": [
-        {
-          "modelMatch": ".*",
-          "apiTypeMatch": "devin-acp",
-          "config": {
-            "optionSpecs": {
-              "maxOutputTokens": {
-                "map": "{}"
-              }
-            }
-          }
-        },
         {
           "modelMatch": ".*claude-(?:opus-(?:4[.-]8|5)|(?:fable|mythos)-5(?:[.-]1)?)(?:[.\\-:/\\[].*)?",
           "apiTypeMatch": "anthropic-messages",
@@ -4499,13 +4465,6 @@
         }
       ],
       "templateModelRules": [
-        {
-          "templateId": "devin-acp",
-          "modelId": "swe-2-max",
-          "config": {
-            "enabled": true
-          }
-        },
         {
           "templateId": "opencode-go-chat",
           "modelId": "glm-5.3-flash",

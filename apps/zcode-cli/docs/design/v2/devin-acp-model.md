@@ -80,9 +80,30 @@ session 事件流，不需要任何协议扩展。
 新 class `DevinAcpAccessConfig extends ConfigOverlay`，接入
 `ProviderAccessConfig` 联合、`serializeRegistryProviderConfig` 与各 form/resolve 分支。
 
-### 内置模板与模型规则
+### 内置模板与模型规则（本地 Overlay 层）
 
-`config/provider/zcode-builtin.json` 增加模板 `devin-acp`：
+Devin 是本 fork 的私有 Provider，不能写进 `zcode-builtin.json`/`zcode-builtin.test.json`
+参与远端 Release 的 revision 竞争——远端目录每次下发都会把本地条目顶掉。模板与规则
+改为放在 `config/provider/zcode-local-overlay.json`，由
+`NodeZCodeBuiltinProviderConfigSource` 在**快照层**叠加：
+
+- Overlay 默认取 `bundledFilePath` 同目录的 `zcode-local-overlay.json`（可用
+  `localOverlayFilePath` 覆盖或传 `null` 禁用）；文件缺失时等同无 Overlay。
+- 文件结构与 Release 的 `config` 段相同（`providerConfigRules`/`modelConfigRules`），
+  复用同一组 parse 函数与 Schema 校验。
+- 合并语义：providers/providerTemplates 按 id overlay（Overlay 赢）；modelConfigRules
+  追加在末尾（`resolve` 顺序 overlay，Overlay 规则后置生效）。snapshot `revision`
+  保持 `zcode-builtin:<rev>:<sha256>` 形态，Overlay 内容哈希并入 key。
+- Overlay 不写入 Active/LKG Release，也不参与 `applyRemoteRelease` 的同 revision
+  冲突比较——远端目录照常更新，本地条目永远叠加。
+- **Agent 传播**：物化 Active 时把 Overlay 随行复制到 Active 目录
+  （`zcode-local-overlay.json`）。Agent/Worker 进程的 Source 以 Active 路径为
+  bundledFilePath，其同目录默认查找即命中同一 Overlay；Bundled Overlay 移除时
+  随行副本同步删除。
+- 打包：`stageBuiltinProviderConfig` 把 Overlay 拷进 CLI `dist/provider/`；
+  electron-builder `extraResources` 放到 `resources/config/provider/`。
+
+Overlay 中的模板 `devin-acp`：
 
 ```jsonc
 {

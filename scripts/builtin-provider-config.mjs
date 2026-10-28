@@ -68,5 +68,16 @@ export async function stageBuiltinProviderConfig({ directory, ...options }) {
   await mkdir(directory, { recursive: true });
   // bootstrap 可以复用 JS，但不能连带复用上一环境／上一版本的独立配置资源。
   await writeFile(resolve(directory, "zcode-builtin.json"), config.content, "utf8");
+  // 本地 Overlay 与远端 Release 无关，随包同行部署；缺失时不生成，运行时按缺省跳过。
+  const root = options.root ?? repositoryRoot;
+  try {
+    const overlay = await readFile(
+      resolve(root, "config/provider/zcode-local-overlay.json"),
+      "utf8",
+    );
+    await writeFile(resolve(directory, "zcode-local-overlay.json"), overlay, "utf8");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   return config;
 }
