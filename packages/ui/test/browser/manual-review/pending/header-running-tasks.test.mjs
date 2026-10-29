@@ -73,12 +73,14 @@ for (const [width, locale, theme] of [
       await page.goto(`${origin}fixture?locale=${locale}&theme=${theme}`, {
         waitUntil: "domcontentloaded",
       });
-      // 8 个在线 running：前 6 个直显，其余进 +2；completed/offline 不出现。
+      // 8 个在线 running：前 6 个直显，其余进 +2；completed/offline 不出现，
+      // 且 running 已满 6 槽时最近会话不补齐。
       await page.locator(strip).waitFor();
       assert.equal(await page.locator(indicators).count(), 6);
       const overflowButton = page.locator(overflow);
       await overflowButton.waitFor();
       assert.match((await overflowButton.textContent()) ?? "", /\+2/);
+      assert.equal(await page.locator('[data-testid*="done"]').count(), 0);
 
       // 当前激活会话高亮；等待权限的会话用 warning 色转圈。
       const first = page.locator(indicators).first();
@@ -125,3 +127,95 @@ for (const [width, locale, theme] of [
     }
   });
 }
+
+// backfill：2 running + 多个最近会话 → 2 转圈 + 4 静态点补满 6 槽，无折叠。
+test("HRT-E2E-002 backfill 1200/en-US/dark", async () => {
+  const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  page.setDefaultTimeout(15000);
+  page.setDefaultNavigationTimeout(120000);
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const selections = () => page.evaluate(() => window.__headerRunningSelections ?? []);
+  try {
+    await page.goto(`${origin}fixture?locale=en-US&theme=dark&scenario=backfill`, {
+      waitUntil: "domcontentloaded",
+    });
+    await page.locator(strip).waitFor();
+    assert.equal(await page.locator(indicators).count(), 6);
+    // 只有 2 个 running 带 svg 转圈，其余 4 个是静态点；不出现 +N。
+    assert.equal(await page.locator(`${indicators} svg`).count(), 2);
+    assert.equal(await page.locator(overflow).count(), 0);
+
+    // 补齐项状态点：unread→sky、error→destructive、普通→foreground-subtlest。
+    const dotClass = async (entityKey) =>
+      (await page
+        .locator(`[data-testid="header-running-task-${entityKey}"] span.rounded-full`)
+        .getAttribute("class")) ?? "";
+    assert.match(await dotClass("/ws-a::done"), /bg-foreground-subtlest/);
+    assert.match(await dotClass("/ws-a::unread"), /bg-sky-500/);
+    assert.match(await dotClass("/ws-a::failed"), /bg-destructive/);
+    // 第 5 个最近会话超出槽位上限不显示；offline 会话不出现。
+    assert.equal(await page.locator('[data-testid*="archived-feeling"]').count(), 0);
+    assert.equal(await page.locator('[data-testid*="gone"]').count(), 0);
+
+    // 补齐项 tooltip：标题 + 相对时间；点击等同点击 session。
+    const doneIndicator = page.locator('[data-testid="header-running-task-/ws-a::done"]');
+    await doneIndicator.hover();
+    await page.getByRole("tooltip").waitFor();
+    const tooltipText = (await page.getByRole("tooltip").textContent()) ?? "";
+    assert.match(tooltipText, /Finished task/);
+    assert.match(tooltipText, /\d+d/);
+    await page.mouse.move(600, 400);
+    await doneIndicator.click();
+    assert.deepEqual(await selections(), [["/ws-a", "done", null, null]]);
+
+    const artifacts = join(tmpdir(), "zcode-header-running-tasks");
+    await mkdir(artifacts, { recursive: true });
+    await page.screenshot({ path: join(artifacts, "backfill-1200-en-US-dark.png") });
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      true,
+    );
+    assert.deepEqual(errors, []);
+  } catch (error) {
+    const diagnostic = `${String(error)}; pageErrors=${JSON.stringify(errors)}; body=${(await page.locator("body").innerText()).slice(0, 1500)}`;
+    console.error(diagnostic);
+    throw new Error(diagnostic, { cause: error });
+  } finally {
+    await page.close();
+  }
+});
+
+// sparse：全部会话停止且不足 6 个 → 只显示现有数量的静态点。
+test("HRT-E2E-003 sparse 390/zh-CN/light", async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 800 } });
+  page.setDefaultTimeout(15000);
+  page.setDefaultNavigationTimeout(120000);
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  try {
+    await page.goto(`${origin}fixture?locale=zh-CN&theme=light&scenario=sparse`, {
+      waitUntil: "domcontentloaded",
+    });
+    await page.locator(strip).waitFor();
+    assert.equal(await page.locator(indicators).count(), 3);
+    assert.equal(await page.locator(`${indicators} svg`).count(), 0);
+    assert.equal(await page.locator(overflow).count(), 0);
+    assert.equal(await page.locator(`${indicators} span.rounded-full`).count(), 3);
+
+    const artifacts = join(tmpdir(), "zcode-header-running-tasks");
+    await mkdir(artifacts, { recursive: true });
+    await page.screenshot({ path: join(artifacts, "sparse-390-zh-CN-light.png") });
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      true,
+    );
+    assert.deepEqual(errors, []);
+  } catch (error) {
+    const diagnostic = `${String(error)}; pageErrors=${JSON.stringify(errors)}; body=${(await page.locator("body").innerText()).slice(0, 1500)}`;
+    console.error(diagnostic);
+    throw new Error(diagnostic, { cause: error });
+  } finally {
+    await page.close();
+  }
+});

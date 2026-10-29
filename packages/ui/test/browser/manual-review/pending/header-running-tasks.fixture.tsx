@@ -21,9 +21,13 @@ const WS_B_IDENTITY = "ssh://devbox/ws-b";
 const WS_B_REMOTE_SESSION = "remote-session-1";
 
 /**
- * 8 个在线 running：ws-a 5 个（t1 为当前激活会话，t2 等待权限输入→warning 色），
- * ws-b 远程 3 个。再加 1 个 completedSuccess 与 1 个 offline running，
- * 期望直显 6 个图标 + "+2" 折叠，过滤行一律不出现。
+ * 场景由 ?scenario= 控制：
+ * - 默认：8 个在线 running（ws-a 5 个：t1 当前激活、t2 等待权限→warning 色；
+ *   ws-b 远程 3 个）+ 最近会话若干 + 1 个 offline running。
+ *   期望直显 6 个转圈 + "+2" 折叠，最近会话与 offline 不出现。
+ * - backfill：2 个 running + 多个最近会话（含 unread 蓝点、error 红点、普通灰点）
+ *   + 1 个 offline。期望 2 个转圈 + 4 个静态点补满 6 槽，无折叠按钮。
+ * - sparse：0 个 running + 3 个最近会话。期望 3 个静态点，无折叠按钮。
  */
 function task(partial: {
   taskId: string;
@@ -34,6 +38,9 @@ function task(partial: {
   phase?: "prewarming" | "running" | "completedSuccess";
   waiting?: boolean;
   offline?: boolean;
+  unread?: boolean;
+  errorStatus?: boolean;
+  noActivity?: boolean;
 }): WindowHostControllerTaskListItem {
   return {
     taskId: partial.taskId,
@@ -45,56 +52,89 @@ function task(partial: {
     createdAt: 1,
     updatedAt: 1,
     mode: "default",
-    status: "running",
+    status: partial.errorStatus ? "error" : "running",
+    ...(partial.unread ? { unreadAt: 5 } : {}),
     sourceAvailability: partial.offline ? "offline" : "online",
     liveStatus: partial.waiting ? "waiting" : "running",
-    activity: {
-      phase: partial.phase ?? "running",
-      lastActivityAt: 1,
-      hasBackgroundWork: false,
-      ...(partial.waiting
-        ? { pendingInteractions: { permissionCount: 1, userInputCount: 0 } }
-        : {}),
-    },
+    ...(partial.noActivity
+      ? {}
+      : {
+          activity: {
+            phase: partial.phase ?? "running",
+            lastActivityAt: 1,
+            hasBackgroundWork: false,
+            ...(partial.waiting
+              ? { pendingInteractions: { permissionCount: 1, userInputCount: 0 } }
+              : {}),
+          },
+        }),
   } as WindowHostControllerTaskListItem;
 }
 
-const items: WindowHostControllerTaskListItem[] = [
-  task({ taskId: "t1", title: "Fix login crash" }),
-  task({ taskId: "t2", title: "Migrate database", waiting: true }),
-  task({ taskId: "t3", title: "Add dark mode" }),
-  task({ taskId: "t4", title: "Refactor auth" }),
-  task({ taskId: "t5", title: "Bump deps" }),
+const remoteRunning = (taskId: string, title: string) =>
   task({
-    taskId: "t6",
-    title: "Remote build",
+    taskId,
+    title,
     workspacePath: WS_B,
     workspaceIdentity: WS_B_IDENTITY,
     remoteSessionId: WS_B_REMOTE_SESSION,
-  }),
-  task({
-    taskId: "t7",
-    title: "Remote lint",
-    workspacePath: WS_B,
-    workspaceIdentity: WS_B_IDENTITY,
-    remoteSessionId: WS_B_REMOTE_SESSION,
-  }),
-  task({
-    taskId: "t8",
-    title: "Remote deploy",
-    workspacePath: WS_B,
-    workspaceIdentity: WS_B_IDENTITY,
-    remoteSessionId: WS_B_REMOTE_SESSION,
-  }),
+  });
+
+const recentItems = [
   task({ taskId: "done", title: "Finished task", phase: "completedSuccess" }),
   task({
-    taskId: "gone",
-    title: "Offline running",
+    taskId: "unread",
+    title: "Unread update",
+    phase: "completedSuccess",
+    unread: true,
+  }),
+  task({ taskId: "failed", title: "Failed import", errorStatus: true, noActivity: true }),
+  task({
+    taskId: "old-remote",
+    title: "Old remote run",
     workspacePath: WS_B,
     workspaceIdentity: WS_B_IDENTITY,
-    offline: true,
+    remoteSessionId: WS_B_REMOTE_SESSION,
+    phase: "completedSuccess",
   }),
+  task({ taskId: "archived-feeling", title: "Stale draft", phase: "completedSuccess" }),
 ];
+
+const scenario = params.get("scenario");
+const items: WindowHostControllerTaskListItem[] =
+  scenario === "backfill"
+    ? [
+        task({ taskId: "t1", title: "Fix login crash" }),
+        task({ taskId: "t2", title: "Migrate database", waiting: true }),
+        ...recentItems,
+        task({
+          taskId: "gone",
+          title: "Offline running",
+          workspacePath: WS_B,
+          workspaceIdentity: WS_B_IDENTITY,
+          offline: true,
+        }),
+      ]
+    : scenario === "sparse"
+      ? recentItems.slice(0, 3)
+      : [
+          task({ taskId: "t1", title: "Fix login crash" }),
+          task({ taskId: "t2", title: "Migrate database", waiting: true }),
+          task({ taskId: "t3", title: "Add dark mode" }),
+          task({ taskId: "t4", title: "Refactor auth" }),
+          task({ taskId: "t5", title: "Bump deps" }),
+          remoteRunning("t6", "Remote build"),
+          remoteRunning("t7", "Remote lint"),
+          remoteRunning("t8", "Remote deploy"),
+          ...recentItems,
+          task({
+            taskId: "gone",
+            title: "Offline running",
+            workspacePath: WS_B,
+            workspaceIdentity: WS_B_IDENTITY,
+            offline: true,
+          }),
+        ];
 
 const subscribeAck = { subscriptionId: "fixture-sub", mode: "snapshot", logEpoch: "fx" } as const;
 const windowControllerService = {

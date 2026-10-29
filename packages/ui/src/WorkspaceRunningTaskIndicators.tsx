@@ -22,43 +22,51 @@ import { useOptionalTabStore } from "@/store/TabStoreProvider.js";
 import { isWorkspaceTab } from "@/store/tabStore.js";
 import { buildTaskEntityKey, buildTaskWorkspaceKey } from "@/lib/taskQueryCache.js";
 import {
+  deriveTaskLeadingIndicator,
+  formatTaskRelativeTime,
+} from "@/lib/taskListItemPresentation.js";
+import {
   getTaskListAttention,
+  getTaskListRowActivity,
   isTaskListRowRunning,
   type TaskListMetaWithActivity,
 } from "@/v4/taskListRowActivity.js";
 import { WINDOWS_CAPTION_CONTROL_CLASS } from "@/windowCaptionControls.js";
 
-/** Header 直接铺开的运行中会话图标数上限，其余收进 +N 折叠菜单。 */
+/** Header 直接铺开的会话图标数上限；运行中会话超出上限的部分收进 +N 折叠菜单。 */
 export const HEADER_RUNNING_TASKS_MAX_VISIBLE = 6;
 
-type RunningTaskItem = WindowHostControllerTaskListItem & Partial<TaskListMetaWithActivity>;
+type HeaderTaskItem = WindowHostControllerTaskListItem & Partial<TaskListMetaWithActivity>;
 
 /**
- * Header 运行指示条的成员判定：与侧栏转圈同一语义（sessions-index 实时 phase），
+ * Header 指示条的槽位分配：与侧栏转圈同一语义（sessions-index 实时 phase），
  * 离线远程 source 的冻结快照不计入——断连时 lastActivityAt 不再推进，转圈会误导。
+ * 运行中会话优先占槽；槽位富余时按列表顺序（updatedAt 排序）用最近会话补齐，
+ * 让指示条始终保持满槽，只有整个集合为空才隐藏。
  */
-export function selectHeaderRunningTasks(
+export function selectHeaderIndicatorTasks(
   items: readonly WindowHostControllerTaskListItem[],
-): RunningTaskItem[] {
-  return items.filter(
-    (item): item is RunningTaskItem =>
-      item.sourceAvailability === "online" && isTaskListRowRunning(item),
+  maxVisible: number,
+): { visible: HeaderTaskItem[]; overflow: HeaderTaskItem[] } {
+  const online = items.filter(
+    (item): item is HeaderTaskItem => item.sourceAvailability === "online",
   );
+  const running = online.filter(isTaskListRowRunning);
+  const limit = Math.max(0, maxVisible);
+  if (running.length >= limit) {
+    return { visible: running.slice(0, limit), overflow: running.slice(limit) };
+  }
+  // Bugfix-context: 用户要求指示条常显——running 占不满时用最近会话补位，
+  // 补齐项不参与 +N 折叠（完整列表在侧栏），因此 overflow 只来自运行中超额部分。
+  const backfill = online
+    .filter((item) => !isTaskListRowRunning(item))
+    .slice(0, limit - running.length);
+  return { visible: [...running, ...backfill], overflow: [] };
 }
 
 /** 会话等待权限/输入时 phase 仍是 running；用它切换 warning 色与 tooltip 等待标签。 */
-export function isHeaderRunningTaskWaiting(item: RunningTaskItem): boolean {
+export function isHeaderRunningTaskWaiting(item: HeaderTaskItem): boolean {
   return getTaskListAttention(item) !== null;
-}
-
-export function splitHeaderRunningTasks(
-  tasks: readonly RunningTaskItem[],
-  maxVisible: number,
-): { visible: RunningTaskItem[]; overflow: RunningTaskItem[] } {
-  return {
-    visible: tasks.slice(0, Math.max(0, maxVisible)),
-    overflow: tasks.slice(Math.max(0, maxVisible)),
-  };
 }
 
 export function WorkspaceRunningTaskIndicators({
@@ -90,8 +98,8 @@ export function WorkspaceRunningTaskIndicators({
     expanded: true,
     collapsedLimit: 1,
   });
-  const runningTasks = useMemo(
-    () => selectHeaderRunningTasks(runningTaskList.items),
+  const { visible, overflow } = useMemo(
+    () => selectHeaderIndicatorTasks(runningTaskList.items, HEADER_RUNNING_TASKS_MAX_VISIBLE),
     [runningTaskList.items],
   );
   const workspaceLabelByKey = useMemo(
@@ -106,16 +114,11 @@ export function WorkspaceRunningTaskIndicators({
   );
   const activeWorkspaceKey = buildTaskWorkspaceKey(activeWorkspacePath, activeWorkspaceIdentity);
 
-  if (runningTasks.length === 0) {
+  if (visible.length === 0) {
     return null;
   }
 
-  const { visible, overflow } = splitHeaderRunningTasks(
-    runningTasks,
-    HEADER_RUNNING_TASKS_MAX_VISIBLE,
-  );
-
-  const renderTooltipContent = (task: RunningTaskItem) => {
+  const renderTooltipContent = (task: HeaderTaskItem) => {
     const taskTitle =
       task.title ||
       intl.formatMessage({
@@ -142,11 +145,16 @@ export function WorkspaceRunningTaskIndicators({
           </span>
         ) : null}
         {attentionLabel ? <span className="text-warning">{attentionLabel}</span> : null}
+        {!isTaskListRowRunning(task) ? (
+          <span className="text-foreground-subtlest">
+            {formatTaskRelativeTime(task.updatedAt, intl)}
+          </span>
+        ) : null}
       </span>
     );
   };
 
-  const renderSpinner = (task: RunningTaskItem, className?: string) => (
+  const renderSpinner = (task: HeaderTaskItem, className?: string) => (
     <LoaderIcon
       aria-hidden="true"
       className={cn(
@@ -156,6 +164,26 @@ export function WorkspaceRunningTaskIndicators({
       )}
     />
   );
+
+  // 补齐槽位的非运行会话用静态状态点，与侧栏 deriveTaskLeadingIndicator 同一语义：
+  // error 红点 / unread 蓝点 / 普通灰点；不旋转，避免被误当成还在执行。
+  const renderStatusDot = (task: HeaderTaskItem, className?: string) => {
+    const indicator = deriveTaskLeadingIndicator(task, getTaskListRowActivity(task));
+    const dotClass =
+      indicator === "error"
+        ? "bg-destructive"
+        : indicator === "unread"
+          ? "bg-sky-500 dark:bg-sky-400"
+          : "bg-foreground-subtlest";
+    return (
+      <span
+        aria-hidden="true"
+        className={cn("flex size-4 shrink-0 items-center justify-center", className)}
+      >
+        <span className={cn("size-2 rounded-full", dotClass)} />
+      </span>
+    );
+  };
 
   return (
     <div
@@ -189,7 +217,7 @@ export function WorkspaceRunningTaskIndicators({
                 )
               }
             >
-              {renderSpinner(task, "size-4")}
+              {isTaskListRowRunning(task) ? renderSpinner(task, "size-4") : renderStatusDot(task)}
             </Button>
           </ControlHintTooltip>
         );
