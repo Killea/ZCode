@@ -221,6 +221,12 @@ export function buildStandardChromeInstallations(
     });
   }
 
+  // darwin/win32 之外只剩 linux 有真实 Chrome 安装形态；aix/freebsd 等不受支持平台
+  // 以前会落到 Linux 候选，装了 Chrome 的开发机上探测反而“成功”，无法表达“平台不支持”。
+  if (platform !== "linux") {
+    return [];
+  }
+
   const configRoot = env.CHROME_CONFIG_HOME ?? env.XDG_CONFIG_HOME ?? join(homeDir, ".config");
   const standardInstallations = browsers.map((browser) => ({
     browser,
