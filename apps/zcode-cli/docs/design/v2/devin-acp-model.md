@@ -147,6 +147,19 @@ spawn 选项：`command=devin binary 绝对路径`、`args=["acp","--model",<mod
 
 ### DevinAcpBridge
 
+`modelFactory` 每次调用都会新建 `DevinModelExecutor`，但 bridge 不能随之新建：
+spawn + initialize + authenticate 成本很高，且本机无 `credentials.toml` 时
+`devin-browser` 方法每次都走浏览器 PKCE（"每次调用都弹登录"的根因）。
+`DevinModelExecutor` 因此持有**模块级静态 bridge 池**，key =
+{binaryPath, apiKey(sha256), modelId, mode, cwd, promptTimeoutMs, mcpPassthrough}；
+同 key 的 executor 复用同一 `devin acp` 进程与 ACP session——authenticate
+每 agent 进程生命周期至多一次，且 Devin 侧保留真实会话历史（不再每轮靠
+序列化前缀冷启动）。池化复用时 `updateDeps` 刷新 listMcpServers/logger。
+
+> 彻底免弹窗的另一条路径：用户执行一次 `devin auth login`（持久化
+> `credentials.toml`，不过期）或在 access.apiKey 填 Devin API key
+> （`meta.api_key` 通道，无浏览器）。两者都属用户侧选择，代码不代填。
+
 进程内单例，管理 `devin acp` 生命周期与会话池：
 
 ```text

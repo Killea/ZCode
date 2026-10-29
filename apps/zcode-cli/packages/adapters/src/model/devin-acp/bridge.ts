@@ -56,8 +56,8 @@ const CONTEXT_RESOURCE_URI = "zcode://context";
  * 是否需要附带上历史前缀）。
  */
 export class DevinAcpBridge {
-  private readonly options: DevinAcpBridgeOptions;
-  private readonly logger?: Logger;
+  private options: DevinAcpBridgeOptions;
+  private logger?: Logger;
   private transport?: AcpTransport;
   private resolution?: DevinBinaryResolution;
   private starting?: Promise<void>;
@@ -67,6 +67,15 @@ export class DevinAcpBridge {
   constructor(options: DevinAcpBridgeOptions) {
     this.options = options;
     this.logger = options.logger;
+  }
+
+  /**
+   * 池化复用时刷新可变的注入依赖。影响握手结果的字段（binary/apiKey/model/mode/cwd）
+   * 都在池 key 里，不会走到这里；这里只接收 getter/logger 这类"每实例新引用"的依赖。
+   */
+  updateDeps(deps: Pick<DevinAcpBridgeOptions, "listMcpServers" | "logger">): void {
+    this.options = { ...this.options, listMcpServers: deps.listMcpServers };
+    this.logger = deps.logger;
   }
 
   /** 进程可用性探针：供连通性测试走与正式请求相同的路径。 */

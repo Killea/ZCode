@@ -195,6 +195,23 @@ describe("DevinModelExecutor context usage", () => {
     expect(texts).toContain("hecho");
   });
 
+  it("同配置的两个 executor 共享同一 bridge 实例", async () => {
+    const ensure = vi
+      .spyOn(DevinAcpBridge.prototype, "ensureSession")
+      .mockResolvedValue({ acpSessionId: "s1", isNew: false });
+    const run = vi
+      .spyOn(DevinAcpBridge.prototype, "runPrompt")
+      .mockImplementation(async () => ({ stopReason: "end_turn" }));
+    const opts = { promptTimeoutMs: 1000, cwd: "/tmp" };
+    const e1 = new DevinModelExecutor(opts);
+    const e2 = new DevinModelExecutor(opts);
+    for await (const _ of e1.streamText(request("a"))) void _;
+    for await (const _ of e2.streamText(request("b"))) void _;
+    // 池化证据：两次调用的 ensureSession/runPrompt 都落在同一 this 上。
+    const contexts = new Set([...ensure.mock.contexts, ...run.mock.contexts]);
+    expect(contexts.size).toBe(1);
+  });
+
   it("sin usage_update finish.usage queda vacío (meter oculto, nada fabricado)", async () => {
     vi.spyOn(DevinAcpBridge.prototype, "ensureSession").mockResolvedValue({
       acpSessionId: "s1",

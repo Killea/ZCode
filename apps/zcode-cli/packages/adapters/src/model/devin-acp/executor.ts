@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   getCurrentModelInvocationContext,
   modelMessageContentToText,
@@ -22,6 +23,26 @@ const DEFAULT_SESSION_KEY = "default";
 const TEXT_BLOCK_ID = "devin-text";
 const REASONING_BLOCK_ID = "devin-thought";
 
+/**
+ * 桥接进程池 key：覆盖一切改变子进程握手结果的配置。
+ * apiKey 只算哈希不进明文，避免 key 意外落日志时泄露。
+ */
+function bridgePoolKey(options: DevinModelExecutorOptions): string {
+  return JSON.stringify({
+    binaryPath: options.binaryPath ?? null,
+    apiKey: options.apiKey ? hashSecret(options.apiKey) : null,
+    modelId: options.modelId ?? null,
+    mode: options.mode ?? null,
+    cwd: options.cwd,
+    promptTimeoutMs: options.promptTimeoutMs,
+    mcpPassthrough: options.listMcpServers ? true : false,
+  });
+}
+
+function hashSecret(secret: string): string {
+  return createHash("sha256").update(secret).digest("hex").slice(0, 16);
+}
+
 export interface DevinModelExecutorOptions extends DevinAcpBridgeOptions {
   readonly contextForward?: DevinContextForwardPolicy | null;
 }
@@ -32,11 +53,28 @@ export interface DevinModelExecutorOptions extends DevinAcpBridgeOptions {
  * ZCode 原生 tool schema 不转发（Devin 无法执行它们，prompt 注入只会诱发幻觉）。
  */
 export class DevinModelExecutor implements ModelExecutor {
+  /**
+   * bridge 进程池：modelFactory 每次调用都会新建 executor，
+   * 但 devin acp 子进程 + authenticate 很贵（无持久凭证时浏览器 PKCE）。
+   * 同一配置共享一个 bridge，authenticate 每进程生命周期只发生一次，
+   * ACP session 也得以跨调用保留（真续聊，不靠历史前缀重发）。
+   */
+  private static readonly bridgePool = new Map<string, DevinAcpBridge>();
+
   private readonly bridge: DevinAcpBridge;
   private readonly contextForward: DevinContextForwardPolicy;
 
   constructor(options: DevinModelExecutorOptions) {
-    this.bridge = new DevinAcpBridge(options);
+    const key = bridgePoolKey(options);
+    let bridge = DevinModelExecutor.bridgePool.get(key);
+    if (bridge === undefined) {
+      bridge = new DevinAcpBridge(options);
+      DevinModelExecutor.bridgePool.set(key, bridge);
+    } else {
+      // 同 key 复用时刷新注入依赖（logger / listMcpServers getter 可能换了实例）。
+      bridge.updateDeps(options);
+    }
+    this.bridge = bridge;
     this.contextForward = options.contextForward ?? "memory-only";
   }
 
