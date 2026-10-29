@@ -83,4 +83,11 @@ export interface WorkspaceHeaderActionSectionProps {
   hideHelpMenu?: boolean;
   showWindowControls?: boolean;
   useWindowsCaptionSpacing?: boolean;
+  /** 运行中会话指示条的点击跳转；与侧栏任务行同一条选择链路。 */
+  onSelectTask?: (
+    workspacePath: string,
+    taskId: string,
+    workspaceIdentity?: string,
+    remoteSessionId?: string,
+  ) => void;
 }

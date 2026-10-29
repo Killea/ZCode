@@ -526,6 +526,12 @@ export const TID_WORKSPACE_TITLE = "workspace-title";
 export const TID_WORKSPACE_PATH = "workspace-path";
 /** 工作区 Header 更多菜单按钮 */
 export const TID_WORKSPACE_MORE_BUTTON = "workspace-more-button";
+/** Header 运行中会话指示条容器 */
+export const TID_HEADER_RUNNING_TASKS = "header-running-tasks";
+/** Header 运行中会话图标（动态后缀为 task entity key） */
+export const TID_HEADER_RUNNING_TASK = "header-running-task";
+/** Header 运行中会话溢出折叠按钮 */
+export const TID_HEADER_RUNNING_TASKS_OVERFLOW = "header-running-tasks-overflow";
 /** 右上角问号帮助菜单触发按钮 */
 export const TID_WORKSPACE_HELP_MENU_TRIGGER = "workspace-help-menu-trigger";
 /** 问号帮助菜单里的「资源管理器」项（仅桌面端） */

@@ -1,5 +1,6 @@
 import { WorkspaceEditorButtonGroup } from "@/WorkspaceEditorButtonGroup.js";
 import { WorkspaceFilesToggleButton } from "@/WorkspaceFilesToggleButton.js";
+import { WorkspaceRunningTaskIndicators } from "@/WorkspaceRunningTaskIndicators.js";
 import { WorkspaceSidePaneToggleButton } from "@/WorkspaceSidePaneToggleButton.js";
 import { WorkspaceTerminalToggleButton } from "@/WorkspaceTerminalToggleButton.js";
 import { cn } from "@/components/lib/utils.js";
@@ -33,6 +34,7 @@ export function WorkspaceHeaderActionSection({
   hideHelpMenu = false,
   showWindowControls = false,
   useWindowsCaptionSpacing = false,
+  onSelectTask,
 }: WorkspaceHeaderActionSectionProps) {
   return (
     <div
@@ -43,6 +45,16 @@ export function WorkspaceHeaderActionSection({
         useWindowsCaptionSpacing ? "-my-2 h-12 gap-0" : "gap-0.5",
       )}
     >
+      {/* 运行中会话指示条放在功能图标最左侧；手机远控窄头不挂载，与其它面板入口同一门禁。 */}
+      {!simplifyForNarrowRemote && onSelectTask ? (
+        <WorkspaceRunningTaskIndicators
+          activeWorkspacePath={workspaceAbsPath}
+          {...(workspaceIdentity ? { activeWorkspaceIdentity: workspaceIdentity } : {})}
+          activeTaskId={activeTaskId}
+          onSelectTask={onSelectTask}
+          useWindowsCaptionSpacing={useWindowsCaptionSpacing}
+        />
+      ) : null}
       {variant === "task" ? (
         <WorkspaceEditorButtonGroup
           disabledReason={readOnlyReason}

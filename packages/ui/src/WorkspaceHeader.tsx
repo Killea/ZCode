@@ -68,6 +68,7 @@ export function WorkspaceHeader({
   onReloadSession,
   reloadSessionDisabled,
   reloadSessionPending,
+  onSelectTask,
 }: {
   variant?: WorkspaceHeaderVariant;
   draftDropTargetController?: ConversationDropTargetController | null;
@@ -125,6 +126,13 @@ export function WorkspaceHeader({
   onCreateTask: () => void;
   onOpenWorkspace: () => void;
   allowOpenWorkspace?: boolean;
+  /** 运行中会话指示条的点击跳转；与侧栏任务行同一条选择链路。 */
+  onSelectTask?: (
+    workspacePath: string,
+    taskId: string,
+    workspaceIdentity?: string,
+    remoteSessionId?: string,
+  ) => void;
 }) {
   const [selectedEditor, setSelectedEditor] = useState<EditorInfo | null>(null);
   const shouldOffsetHeaderForWindowControls = !isSidebarVisible;
@@ -236,9 +244,9 @@ export function WorkspaceHeader({
           showWindowControls={usesInlineWindowControls}
           // 面板操作按钮沿用 macOS 紧凑样式，Windows/Linux 窗控跟随最右侧 Header。
           onSelectedEditorChange={setSelectedEditor}
+          onSelectTask={onSelectTask}
         />
       </div>
-
     </header>
   );
 }

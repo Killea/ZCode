@@ -1954,6 +1954,7 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
                   onCreateTask={handleCreateTaskInChat}
                   onOpenWorkspace={onOpenWorkspace}
                   allowOpenWorkspace={allowOpenWorkspace}
+                  onSelectTask={handleSelectTaskInChat}
                 />
               </ScopedErrorBoundary>
             ) : null
@@ -2385,6 +2386,7 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
                             onCreateTask={handleCreateTaskInChat}
                             onOpenWorkspace={onOpenWorkspace}
                             allowOpenWorkspace={allowOpenWorkspace}
+                            onSelectTask={handleSelectTaskInChat}
                           />
                         </ScopedErrorBoundary>
                       ) : null}
