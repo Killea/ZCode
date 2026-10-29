@@ -13,7 +13,11 @@ import {
   flattenTranscriptForNewSession,
 } from "../src/model/devin-acp/context-filter.js";
 import { AcpTransport } from "../src/model/devin-acp/transport.js";
-import { DevinAcpBridge } from "../src/model/devin-acp/bridge.js";
+import {
+  createUpdateMarkerState,
+  DevinAcpBridge,
+  normalizeSessionUpdate,
+} from "../src/model/devin-acp/bridge.js";
 import { DevinModelExecutor } from "../src/model/devin-acp/executor.js";
 
 const system = (text: string): ModelInputMessage => ({ role: "system", content: text });
@@ -162,6 +166,68 @@ describe("AcpTransport", () => {
   });
 });
 
+describe("normalizeSessionUpdate tool/plan markers", () => {
+  const toolUpdate = (extra: Record<string, unknown>) => ({
+    sessionUpdate: "tool_call_update",
+    ...extra,
+  });
+
+  it("丢弃无标题的纯状态心跳", () => {
+    const state = createUpdateMarkerState();
+    expect(
+      normalizeSessionUpdate(
+        toolUpdate({ toolCallId: "t1", status: "in_progress" }),
+        state,
+      ),
+    ).toBeUndefined();
+    expect(
+      normalizeSessionUpdate({ sessionUpdate: "tool_call", status: "pending" }, state),
+    ).toBeUndefined();
+  });
+
+  it("同一 toolCallId+title 只发第一条，in_progress 状态不展示", () => {
+    const state = createUpdateMarkerState();
+    const first = normalizeSessionUpdate(
+      toolUpdate({ toolCallId: "t1", title: "Ran ls, echo, grep", status: "in_progress" }),
+      state,
+    );
+    expect(first).toEqual({ kind: "tool", title: "Ran ls, echo, grep" });
+    // 同 id 同标题的 completed 更新去重 → 每个工具最终一行。
+    expect(
+      normalizeSessionUpdate(
+        toolUpdate({ toolCallId: "t1", title: "Ran ls, echo, grep", status: "completed" }),
+        state,
+      ),
+    ).toBeUndefined();
+    // 同 id 新标题（工具换动作）仍发。
+    expect(
+      normalizeSessionUpdate(
+        toolUpdate({ toolCallId: "t1", title: "Ran pytest", status: "completed" }),
+        state,
+      ),
+    ).toEqual({ kind: "tool", title: "Ran pytest", status: "completed" });
+  });
+
+  it("plan 内容不变去重，变化才发", () => {
+    const state = createUpdateMarkerState();
+    const entries = [{ content: "step1", status: "pending" }];
+    const first = normalizeSessionUpdate(
+      { sessionUpdate: "plan", entries },
+      state,
+    );
+    expect(first?.kind).toBe("plan");
+    expect(
+      normalizeSessionUpdate({ sessionUpdate: "plan", entries }, state),
+    ).toBeUndefined();
+    expect(
+      normalizeSessionUpdate(
+        { sessionUpdate: "plan", entries: [{ content: "step2", status: "pending" }] },
+        state,
+      )?.kind,
+    ).toBe("plan");
+  });
+});
+
 describe("DevinModelExecutor context usage", () => {
   const request = (text: string) =>
     ({
@@ -210,6 +276,43 @@ describe("DevinModelExecutor context usage", () => {
     // 池化证据：两次调用的 ensureSession/runPrompt 都落在同一 this 上。
     const contexts = new Set([...ensure.mock.contexts, ...run.mock.contexts]);
     expect(contexts.size).toBe(1);
+  });
+
+  it("交叉的 thought/text 各开独立块，块序=到达序", async () => {
+    vi.spyOn(DevinAcpBridge.prototype, "ensureSession").mockResolvedValue({
+      acpSessionId: "s1",
+      isNew: false,
+    });
+    vi.spyOn(DevinAcpBridge.prototype, "runPrompt").mockImplementation(
+      async (input: { onUpdate: (u: unknown) => void }) => {
+        input.onUpdate({ kind: "text", text: "A1" });
+        input.onUpdate({ kind: "thought", text: "T1" });
+        input.onUpdate({ kind: "tool", title: "Ran ls" });
+        input.onUpdate({ kind: "text", text: "A2" });
+        return { stopReason: "end_turn" };
+      },
+    );
+    const executor = new DevinModelExecutor({ promptTimeoutMs: 1000, cwd: "/tmp" });
+    const types: string[] = [];
+    for await (const event of executor.streamText(request("hola"))) {
+      types.push(`${event.type}${"id" in event ? `:${event.id}` : ""}`);
+    }
+    // text(A1) → thought(T1) → text(marker+A2)：三个块依次开闭，不共用一个 id。
+    const blockEvents = types.filter((t) => !t.startsWith("start") && !t.startsWith("finish"));
+    const textIds = blockEvents
+      .filter((t) => t.startsWith("text"))
+      .map((t) => t.split(":")[1]);
+    const reasoningIds = blockEvents
+      .filter((t) => t.startsWith("reasoning"))
+      .map((t) => t.split(":")[1]);
+    expect(new Set(textIds).size).toBe(2); // A1 块 + 标记/A2 块
+    expect(new Set(reasoningIds).size).toBe(1);
+    // 事件顺序：text_start → delta(A1) → text_end → reasoning_* → text_start → deltas → text_end
+    const seq = types.map((t) => t.split(":")[0]);
+    const i1 = seq.indexOf("reasoning_start");
+    const i2 = seq.lastIndexOf("text_start");
+    expect(i2).toBeGreaterThan(seq.indexOf("reasoning_end"));
+    expect(i1).toBeGreaterThan(seq.indexOf("text_delta"));
   });
 
   it("sin usage_update finish.usage queda vacío (meter oculto, nada fabricado)", async () => {

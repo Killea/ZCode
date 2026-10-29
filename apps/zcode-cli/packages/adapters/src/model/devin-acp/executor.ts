@@ -109,15 +109,26 @@ export class DevinModelExecutor implements ModelExecutor {
     }
 
     const updates = new UpdateQueue();
-    let textStarted = false;
-    let reasoningStarted = false;
+    // 交叉的 text/thought 段必须各开各的块（递增 id），否则渲染层按块建序
+    // 会把后建的块整段挪到结尾——工具标记/思考都跑到正文之后。
+    let blockSeq = 0;
+    let openTextId: string | undefined;
+    let openReasoningId: string | undefined;
     // Devin usage_update 可能在一轮 prompt 内多次到达（流式中途 + 结束时），
     // finish.usage 只带最后一份快照；meter 语义是"当前占用"而不是累计值。
     let latestUsage: Extract<DevinAcpUpdate, { kind: "usage" }> | undefined;
     const closeReasoning = function* (): Generator<ModelEvent> {
-      if (reasoningStarted) {
-        reasoningStarted = false;
-        yield { type: "reasoning_end", id: REASONING_BLOCK_ID };
+      if (openReasoningId) {
+        const id = openReasoningId;
+        openReasoningId = undefined;
+        yield { type: "reasoning_end", id };
+      }
+    };
+    const closeText = function* (): Generator<ModelEvent> {
+      if (openTextId) {
+        const id = openTextId;
+        openTextId = undefined;
+        yield { type: "text_end", id };
       }
     };
 
@@ -147,29 +158,30 @@ export class DevinModelExecutor implements ModelExecutor {
           continue;
         }
         if (update.kind === "thought") {
-          if (!reasoningStarted) {
-            reasoningStarted = true;
-            yield { type: "reasoning_start", id: REASONING_BLOCK_ID };
+          yield* closeText();
+          if (!openReasoningId) {
+            openReasoningId = `${REASONING_BLOCK_ID}-${++blockSeq}`;
+            yield { type: "reasoning_start", id: openReasoningId };
           }
-          yield { type: "reasoning_delta", id: REASONING_BLOCK_ID, text: update.text };
+          yield { type: "reasoning_delta", id: openReasoningId, text: update.text };
           continue;
         }
         yield* closeReasoning();
-        if (!textStarted) {
-          textStarted = true;
-          yield { type: "text_start", id: TEXT_BLOCK_ID };
+        if (!openTextId) {
+          openTextId = `${TEXT_BLOCK_ID}-${++blockSeq}`;
+          yield { type: "text_start", id: openTextId };
         }
         if (update.kind === "text") {
-          yield { type: "text_delta", id: TEXT_BLOCK_ID, text: update.text };
+          yield { type: "text_delta", id: openTextId, text: update.text };
         } else if (update.kind === "tool") {
           const status = update.status ? ` (${update.status})` : "";
-          yield { type: "text_delta", id: TEXT_BLOCK_ID, text: `\n[devin tool] ${update.title}${status}\n` };
+          yield { type: "text_delta", id: openTextId, text: `\n[devin tool] ${update.title}${status}\n` };
         } else if (update.kind === "plan" && update.text) {
-          yield { type: "text_delta", id: TEXT_BLOCK_ID, text: update.text };
+          yield { type: "text_delta", id: openTextId, text: update.text };
         }
       }
       yield* closeReasoning();
-      if (textStarted) yield { type: "text_end", id: TEXT_BLOCK_ID };
+      yield* closeText();
       yield {
         type: "finish",
         finishReason: mapStopReason(stopReason),
@@ -183,7 +195,7 @@ export class DevinModelExecutor implements ModelExecutor {
       };
     } catch (error) {
       yield* closeReasoning();
-      if (textStarted) yield { type: "text_end", id: TEXT_BLOCK_ID };
+      yield* closeText();
       throw error;
     }
   }

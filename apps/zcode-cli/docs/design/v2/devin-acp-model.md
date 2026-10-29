@@ -193,10 +193,14 @@ ModelRequest.messages
   ├─ 末尾 user 消息 → ACP text part（唯一必须发送的内容）
   └─ assistant/tool 历史 → 不发送（Devin session 自有记忆；首轮冷起除外见下）
 
-session/update 通知 → ModelStreamEvent
+session/update 通知 → ModelStreamEvent（交叉段必须各开递增 id 的块，
+块序 = 到达序；共用固定 id 会让渲染层按块建序、把后建的块整段挪到结尾）
   ├─ agent_message_chunk   → text_delta
   ├─ agent_thought_chunk   → reasoning_delta
-  ├─ tool_call/plan/…      → 渲染为文本标记（如 `\n[devin: bash $ ls]\n`）
+  ├─ tool_call/update    → 文本标记 `[devin tool] <title> (<终态>)`；
+  │                        无标题纯心跳丢弃，同 toolCallId+title 去重（每工具一行），
+  │                        in_progress/pending 状态不展示
+  ├─ plan                → 文本标记；按格式化文本去重（内容不变只发一次）
   │                        ⚠ 绝不映射为 tool_call 事件（否则 zcode 尝试执行）
   ├─ usage_update          → finish.usage{contextTokens=used, contextWindow=size}
   │                        （ última del turno; NO entra en token ledger — ver

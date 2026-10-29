@@ -63,6 +63,8 @@ export class DevinAcpBridge {
   private starting?: Promise<void>;
   private readonly sessions = new Map<string, SessionRecord>();
   private readonly updateHandlers = new Map<string, (update: DevinAcpUpdate) => void>();
+  /** 每个 ACP session 的工具/plan 标记去重状态；随 sessions 一起清理。 */
+  private readonly markerStates = new Map<string, UpdateMarkerState>();
 
   constructor(options: DevinAcpBridgeOptions) {
     this.options = options;
@@ -125,6 +127,7 @@ export class DevinAcpBridge {
   async dispose(): Promise<void> {
     this.sessions.clear();
     this.updateHandlers.clear();
+    this.markerStates.clear();
     await this.transport?.close();
     this.transport = undefined;
   }
@@ -152,6 +155,7 @@ export class DevinAcpBridge {
     transport.onRequest((method, params) => this.onReverseRequest(method, params));
     transport.onExitOnce(() => {
       this.sessions.clear();
+      this.markerStates.clear();
       this.transport = undefined;
       this.logger?.warn("[devin-acp] process exited; sessions dropped");
     });
@@ -266,7 +270,13 @@ export class DevinAcpBridge {
     const handler = notification.sessionId
       ? this.updateHandlers.get(notification.sessionId)
       : undefined;
-    const update = normalizeSessionUpdate(notification.update);
+    const sessionKey = notification.sessionId ?? "";
+    let markerState = this.markerStates.get(sessionKey);
+    if (!markerState) {
+      markerState = createUpdateMarkerState();
+      this.markerStates.set(sessionKey, markerState);
+    }
+    const update = normalizeSessionUpdate(notification.update, markerState);
     if (handler && update) handler(update);
   }
 
@@ -288,7 +298,24 @@ export class DevinAcpBridge {
   }
 }
 
-function normalizeSessionUpdate(update: unknown): DevinAcpUpdate | undefined {
+/**
+ * 工具/plan 标记的去重状态（每 ACP session 一份）。
+ * toolCallId -> 已发出的标题；plan -> 已发出的格式化文本。
+ */
+export interface UpdateMarkerState {
+  readonly emitted: Map<string, string>;
+}
+
+export function createUpdateMarkerState(): UpdateMarkerState {
+  return { emitted: new Map() };
+}
+
+const PLAN_MARKER_KEY = "__plan__";
+
+export function normalizeSessionUpdate(
+  update: unknown,
+  markerState?: UpdateMarkerState,
+): DevinAcpUpdate | undefined {
   if (typeof update !== "object" || update === null) return undefined;
   const record = update as Record<string, unknown>;
   const kind = record.sessionUpdate;
@@ -301,12 +328,35 @@ function normalizeSessionUpdate(update: unknown): DevinAcpUpdate | undefined {
     return text === undefined ? undefined : { kind: "thought", text };
   }
   if (kind === "tool_call" || kind === "tool_call_update") {
-    const title = typeof record.title === "string" ? record.title : "tool";
-    const status = typeof record.status === "string" ? record.status : undefined;
+    // 纯状态心跳没有信息量（"[devin tool] tool (in_progress)" 刷屏来源），丢弃；
+    // 同一 toolCallId+title 只报第一条，收敛到每个工具一行。
+    const title =
+      typeof record.title === "string" && record.title.trim()
+        ? record.title
+        : undefined;
+    if (!title) return undefined;
+    const toolCallId =
+      typeof record.toolCallId === "string" && record.toolCallId
+        ? record.toolCallId
+        : title;
+    if (markerState?.emitted.get(toolCallId) === title) return undefined;
+    markerState?.emitted.set(toolCallId, title);
+    // in_progress/pending 状态会留在最终文本里产生"永远进行中"的假象；
+    // 只有终态/错误类状态值得展示。
+    const rawStatus = typeof record.status === "string" ? record.status : undefined;
+    const status =
+      rawStatus && rawStatus !== "in_progress" && rawStatus !== "pending"
+        ? rawStatus
+        : undefined;
     return { kind: "tool", title, ...(status === undefined ? {} : { status }) };
   }
   if (kind === "plan") {
-    return { kind: "plan", text: formatPlan(record.entries) };
+    const text = formatPlan(record.entries);
+    // plan 更新按内容全量重发；内容没变就丢，避免同一计划反复刷屏。
+    if (!text.trim()) return undefined;
+    if (markerState?.emitted.get(PLAN_MARKER_KEY) === text) return undefined;
+    markerState?.emitted.set(PLAN_MARKER_KEY, text);
+    return { kind: "plan", text };
   }
   if (kind === "usage_update") {
     const used = nonNegativeFiniteNumber(record.used);
