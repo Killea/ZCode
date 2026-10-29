@@ -135,7 +135,7 @@ export function WorkspaceRunningTaskIndicators({
       : null;
     return (
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="min-w-0 truncate">{taskTitle}</span>
+        <span className="min-w-0 break-words">{taskTitle}</span>
         {workspaceLabel ? (
           <span className="flex min-w-0 items-center gap-1 text-foreground-subtle">
             {task.workspaceIdentity?.trim() ? (
@@ -144,12 +144,17 @@ export function WorkspaceRunningTaskIndicators({
             <span className="min-w-0 truncate">{workspaceLabel}</span>
           </span>
         ) : null}
-        {attentionLabel ? <span className="text-warning">{attentionLabel}</span> : null}
-        {!isTaskListRowRunning(task) ? (
+        {attentionLabel ? (
+          <span className="text-warning">{attentionLabel}</span>
+        ) : isTaskListRowRunning(task) ? (
+          <span className="text-foreground-subtle">
+            {intl.formatMessage({ id: "taskList.status.streaming" })}
+          </span>
+        ) : (
           <span className="text-foreground-subtlest">
             {formatTaskRelativeTime(task.updatedAt, intl)}
           </span>
-        ) : null}
+        )}
       </span>
     );
   };

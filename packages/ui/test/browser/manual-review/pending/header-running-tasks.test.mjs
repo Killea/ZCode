@@ -89,10 +89,12 @@ for (const [width, locale, theme] of [
       assert.match((await svgs[1].getAttribute("class")) ?? "", /text-warning/);
       assert.doesNotMatch((await svgs[0].getAttribute("class")) ?? "", /text-warning/);
 
-      // tooltip 显示 session 名称；远程会话附 workspace 标签。
+      // tooltip 多行：session 名称 + 运行状态行（等待/运行/最近各有文案）。
       await first.hover();
       await page.getByRole("tooltip").waitFor();
-      assert.match((await page.getByRole("tooltip").textContent()) ?? "", /Fix login crash/);
+      const runningTooltip = (await page.getByRole("tooltip").textContent()) ?? "";
+      assert.match(runningTooltip, /Fix login crash/);
+      assert.match(runningTooltip, /Running|生成中/);
       await page.mouse.move(width / 2, 400);
 
       // 点击指示条 = 点击 session：透传 workspacePath/taskId/identity/remoteSessionId。

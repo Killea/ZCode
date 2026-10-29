@@ -9,7 +9,7 @@ Workspace header 右上角功能图标区最左侧展示一排会话指示图标
 - **运行判定**：与侧栏任务行一致——sessions-index 实时 `phase === "prewarming" | "running"`（`isTaskListRowRunning`）。不采信持久化 `status=running` 残留；`sourceAvailability === "offline"` 的远程 source 冻结快照不计入（running 与补齐都不计）。
 - **等待输入**：phase 仍为 running 但有 pending interaction（权限/提问）的会话同样显示转圈，但使用 warning（橙/黄）色区分，tooltip 附等待标签。
 - **图标**：运行中 = `LoaderIcon` 旋转；非运行补齐 = 静态状态点（复用 `deriveTaskLeadingIndicator`：error→destructive、unread→sky、普通→foreground-subtlest），不旋转。ghost `icon-md` 按钮；当前激活 session 用 `!bg-selected` 高亮。
-- **Tooltip**：session 标题；非活动 workspace 的会话附 workspace 标签作为第二行说明；非运行补齐项附相对时间（`formatTaskRelativeTime`）说明"最近"排序依据。
+- **Tooltip**：多行结构——第一行 session 标题（长标题自然换行不截断）；非活动 workspace 的会话附 workspace 标签行；末行状态：等待输入 → 等待标签（warning 色）、运行中 → `taskList.status.streaming`（"Running/生成中"）、非运行补齐 → 相对时间（`formatTaskRelativeTime`）说明"最近"排序依据。
 - **点击**：等价于点击侧栏 session——复用 `handleSelectTaskInChat`（激活/补开 workspace tab → workbench 安置 → `setActiveTaskId` → 未读清理），远程会话透传 `remoteSessionId`。
 - **折叠**：运行中会话超过 6 个时，其余收进 `+N` 按钮的 DropdownMenu，菜单项行为与图标一致。
 - **空态**：整个 online active 集合为空时不渲染，不占位。
